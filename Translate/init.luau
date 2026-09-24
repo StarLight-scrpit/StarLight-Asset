@@ -3,8 +3,8 @@ local HttpService = game:GetService("HttpService")
 local TranslationSettings = {}
 
 local CONFIG = {
-	BaseUrl = "https://raw.githubusercontent.com/StarLight-scrpit/StarLight-Asset/main/Translate/",
-	ContentsUrl = "https://api.github.com/repos/StarLight-scrpit/StarLight-Asset/contents/Translate",
+	BaseUrl = "https://raw.githubusercontent.com/StarLight-scrpit/StarLight-Asset/refs/heads/main/Translate/",
+	ContentsUrl = "https://api.github.com/repos/StarLight-scrpit/StarLight-Asset/contents/Translate?ref=main",
 	DefaultLanguage = "en",
 	FallbackLanguage = "en",
 	UseCache = true,
