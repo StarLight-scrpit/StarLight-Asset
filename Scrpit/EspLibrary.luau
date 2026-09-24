@@ -35,6 +35,13 @@ local Config = {
     Rainbow = false,
     MatchColors = true,
 
+    ESPStyle = "Highlight",
+    BoxThickness = 1,
+    BoxTransparency = 0,
+    BoxColor = Color3.fromRGB(255, 255, 255),
+    UseElementColorForBox = true,
+    CornerLength = 10,
+
     Tracers = false,
     TracerAnchor = "Bottom",
     TracerThickness = 0.5,
@@ -93,6 +100,7 @@ Gui.IgnoreGuiInset = true
 Gui.Parent = Host
 
 local HighlightBucket = Folder(Gui)
+local BoxBucket = Folder(Gui)
 local LabelBucket = Folder(Gui)
 
 local TracerLayer = Instance.new("Frame")
@@ -159,6 +167,8 @@ function Element.new(object, text, color)
     self.Visible = false
 
     self:_BuildHighlight()
+    self:_BuildBox()
+    self:_BuildCorner()
     self:_BuildLabel()
     self:_BuildTracer()
     self:_BuildArrow()
@@ -174,8 +184,61 @@ function Element:_BuildHighlight()
     hl.Adornee = self.Object
     hl.FillTransparency = 1
     hl.OutlineTransparency = 1
+    hl.Enabled = false
     hl.Parent = HighlightBucket
     self.Highlight = hl
+end
+
+function Element:_BuildBox()
+    local frame = Instance.new("Frame")
+    frame.Name = Tag()
+    frame.BackgroundTransparency = 1
+    frame.BorderSizePixel = 0
+    frame.Visible = false
+    frame.Parent = BoxBucket
+
+    local function mk()
+        local l = Instance.new("Frame")
+        l.Name = Tag()
+        l.BorderSizePixel = 0
+        l.BackgroundTransparency = 1
+        l.Parent = frame
+        return l
+    end
+
+    self.BoxFrame = frame
+    self.BoxLines = {
+        Top = mk(),
+        Bottom = mk(),
+        Left = mk(),
+        Right = mk(),
+    }
+end
+
+function Element:_BuildCorner()
+    local frame = Instance.new("Frame")
+    frame.Name = Tag()
+    frame.BackgroundTransparency = 1
+    frame.BorderSizePixel = 0
+    frame.Visible = false
+    frame.Parent = BoxBucket
+
+    local function mk()
+        local l = Instance.new("Frame")
+        l.Name = Tag()
+        l.BorderSizePixel = 0
+        l.BackgroundTransparency = 1
+        l.Parent = frame
+        return l
+    end
+
+    self.CornerFrame = frame
+    self.CornerLines = {
+        TL_H = mk(), TL_V = mk(),
+        TR_H = mk(), TR_V = mk(),
+        BL_H = mk(), BL_V = mk(),
+        BR_H = mk(), BR_V = mk(),
+    }
 end
 
 function Element:_BuildLabel()
@@ -268,6 +331,9 @@ function Element:Leave()
         self.ArrowTriangle.Visible = false
     end
 
+    if self.BoxFrame then self.BoxFrame.Visible = false end
+    if self.CornerFrame then self.CornerFrame.Visible = false end
+
     task.delay(Config.FadeTime + 0.05, function()
         if not self.Active then
             self:Destroy()
@@ -277,6 +343,8 @@ end
 
 function Element:Destroy()
     if self.Highlight then self.Highlight:Destroy() end
+    if self.BoxFrame then self.BoxFrame:Destroy() end
+    if self.CornerFrame then self.CornerFrame:Destroy() end
     if self.LabelFrame then self.LabelFrame:Destroy() end
     if self.Tracer then self.Tracer:Destroy() end
     if self.ArrowImage then self.ArrowImage:Destroy() end
@@ -297,6 +365,122 @@ local function AnchorFor(anchor, viewport)
     end
     local a = Anchors[anchor] or Anchors.Bottom
     return Vector2.new(viewport.X * a.X, viewport.Y * a.Y)
+end
+
+local function ProjectBoundingBox(obj)
+    local cf, size
+    if obj:IsA("Model") then
+        local ok, c, s = pcall(function() return obj:GetBoundingBox() end)
+        if not ok then return nil end
+        cf, size = c, s
+    else
+        cf, size = obj.CFrame, obj.Size
+    end
+
+    local hx, hy, hz = size.X / 2, size.Y / 2, size.Z / 2
+    local pts = {}
+
+    for _, sx in ipairs({ -1, 1 }) do
+        for _, sy in ipairs({ -1, 1 }) do
+            for _, sz in ipairs({ -1, 1 }) do
+                local world = (cf * CFrame.new(hx * sx, hy * sy, hz * sz)).Position
+                local sp = State.Camera:WorldToViewportPoint(world)
+                if sp.Z <= 0 then return nil end
+                table.insert(pts, sp)
+            end
+        end
+    end
+
+    local minX, minY = math.huge, math.huge
+    local maxX, maxY = -math.huge, -math.huge
+    for _, p in ipairs(pts) do
+        if p.X < minX then minX = p.X end
+        if p.Y < minY then minY = p.Y end
+        if p.X > maxX then maxX = p.X end
+        if p.Y > maxY then maxY = p.Y end
+    end
+
+    return minX, minY, maxX - minX, maxY - minY
+end
+
+local function ResolveBoxColor(elementColor)
+    if Config.UseElementColorForBox then
+        return elementColor
+    end
+    return Config.BoxColor
+end
+
+local function RefreshBox(el, obj, color)
+    local style = Config.ESPStyle
+    if style ~= "Box" and style ~= "Corner" then
+        el.BoxFrame.Visible = false
+        el.CornerFrame.Visible = false
+        return
+    end
+
+    local x, y, w, h = ProjectBoundingBox(obj)
+    if not x then
+        el.BoxFrame.Visible = false
+        el.CornerFrame.Visible = false
+        return
+    end
+
+    local t = Config.BoxThickness
+    local tr = Config.BoxTransparency
+    local c = ResolveBoxColor(color)
+
+    if style == "Box" then
+        el.CornerFrame.Visible = false
+        el.BoxFrame.Visible = true
+        el.BoxFrame.Position = UDim2.fromOffset(x, y)
+        el.BoxFrame.Size = UDim2.fromOffset(w, h)
+
+        local B = el.BoxLines
+
+        B.Top.Position = UDim2.fromOffset(0, 0)
+        B.Top.Size = UDim2.new(1, 0, 0, t)
+
+        B.Bottom.Position = UDim2.new(0, 0, 1, -t)
+        B.Bottom.Size = UDim2.new(1, 0, 0, t)
+
+        B.Left.Position = UDim2.fromOffset(0, 0)
+        B.Left.Size = UDim2.new(0, t, 1, 0)
+
+        B.Right.Position = UDim2.new(1, -t, 0, 0)
+        B.Right.Size = UDim2.new(0, t, 1, 0)
+
+        for _, line in pairs(B) do
+            line.BackgroundColor3 = c
+            line.BackgroundTransparency = tr
+        end
+    else
+        el.BoxFrame.Visible = false
+        el.CornerFrame.Visible = true
+        el.CornerFrame.Position = UDim2.fromOffset(x, y)
+        el.CornerFrame.Size = UDim2.fromOffset(w, h)
+
+        local cl = math.min(Config.CornerLength, w / 2, h / 2)
+        local C = el.CornerLines
+
+        local function setLine(line, pos, sz)
+            line.Position = pos
+            line.Size = sz
+            line.BackgroundColor3 = c
+            line.BackgroundTransparency = tr
+        end
+
+        setLine(C.TL_H, UDim2.fromOffset(0, 0), UDim2.fromOffset(cl, t))
+        setLine(C.TL_V, UDim2.fromOffset(0, 0), UDim2.fromOffset(t, cl))
+
+        setLine(C.TR_H, UDim2.new(1, -cl, 0, 0), UDim2.fromOffset(cl, t))
+        setLine(C.TR_V, UDim2.new(1, -t, 0, 0), UDim2.fromOffset(t, cl))
+
+        setLine(C.BL_H, UDim2.new(0, 0, 1, -t), UDim2.fromOffset(cl, t))
+        setLine(C.BL_V, UDim2.new(0, 0, 1, -cl), UDim2.fromOffset(t, cl))
+
+        setLine(C.BR_H, UDim2.new(1, -cl, 1, -t), UDim2.fromOffset(cl, t))
+        setLine(C.BR_V, UDim2.new(1, -t, 1, -cl), UDim2.fromOffset(t, cl))
+    end
 end
 
 local function RefreshArrowImage(el, screen, pos, color)
@@ -380,25 +564,32 @@ local function Refresh(el)
     end
 
     if not onScreen then
-        if el.Highlight then el.Highlight.Enabled = false end
+        el.Highlight.Enabled = false
         el.LabelFrame.Visible = false
         el.Tracer.Visible = false
         el.ArrowImage.Visible = false
         if el.ArrowTriangle then el.ArrowTriangle.Visible = false end
+        el.BoxFrame.Visible = false
+        el.CornerFrame.Visible = false
         el.Visible = false
         return
     end
 
     el.Visible = true
     local color = Config.Rainbow and State.RainbowColor or el.Color
+    local style = Config.ESPStyle
 
-    el.Highlight.Enabled = true
-    el.Highlight.FillColor = color
-    el.Highlight.OutlineColor = Config.MatchColors and color or Config.OutlineColor
-    if el.Active then
-        el.Highlight.FillTransparency = Config.FillTransparency
-        el.Highlight.OutlineTransparency = Config.OutlineTransparency
+    el.Highlight.Enabled = (style == "Highlight")
+    if style == "Highlight" then
+        el.Highlight.FillColor = color
+        el.Highlight.OutlineColor = Config.MatchColors and color or Config.OutlineColor
+        if el.Active then
+            el.Highlight.FillTransparency = Config.FillTransparency
+            el.Highlight.OutlineTransparency = Config.OutlineTransparency
+        end
     end
+
+    RefreshBox(el, obj, color)
 
     el.LabelFrame.Visible = true
     el.LabelFrame.Position = UDim2.fromOffset(screen.X, screen.Y)
@@ -485,6 +676,7 @@ end)
 local API = {}
 API.Config = Config
 API.Anchors = Anchors
+API.Styles = { "Highlight", "Box", "Corner" }
 
 function API:Add(object, text, color)
     if State.Unloaded then return end
@@ -513,6 +705,17 @@ function API:Update(object, text, color)
     if text ~= nil then el.Text = text end
     if color ~= nil then el.Color = color end
 end
+
+function API:SetESPStyle(style)
+    if style ~= "Highlight" and style ~= "Box" and style ~= "Corner" then return end
+    Config.ESPStyle = style
+end
+
+function API:SetBoxThickness(n) Config.BoxThickness = n end
+function API:SetBoxTransparency(n) Config.BoxTransparency = n end
+function API:SetBoxColor(c) Config.BoxColor = c end
+function API:SetUseElementColorForBox(v) Config.UseElementColorForBox = v end
+function API:SetCornerLength(n) Config.CornerLength = n end
 
 function API:SetTextSize(n) Config.TextSize = n end
 function API:SetFont(f) Config.Font = f end
