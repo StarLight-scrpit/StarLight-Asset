@@ -6,12 +6,12 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/StarLight-scrpit/Star
 ```
 - EspLibrary
 ```lua
-loadstring(game:HttpGet("https://raw.githubusercontent.com/StarLight-script/StarLight-Asset/refs/heads/main/Scrpit/EspLibrary.luau"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/StarLight-scrpit/StarLight-Asset/refs/heads/main/Script/EspLibrary.luau"))()
 ```
 
 - NotifyLibrary
 ```lua
-loadstring(game:HttpGet("https://raw.githubusercontent.com/StarLight-scrpit/StarLight-Asset/refs/heads/main/script/NotifyLibrary.luau"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/StarLight-scrpit/StarLight-Asset/refs/heads/main/Script/NotifyLibrary.luau"))()
 ```
 
 StarLight Asset
