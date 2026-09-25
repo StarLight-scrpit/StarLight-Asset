@@ -4,7 +4,15 @@
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/StarLight-scrpit/StarLight-Asset/refs/heads/main/Loader.luau"))()
 ```
+```lua
+- EspLibrary
+loadstring(game:HttpGet("https://raw.githubusercontent.com/StarLight-scrpit/StarLight-Asset/refs/heads/main/Scrpit/EspLibrary.luau"))()
+```
 
+- NotifyLibrary
+```lua
+loadstring(game:HttpGet("https://raw.githubusercontent.com/StarLight-scrpit/StarLight-Asset/refs/heads/main/Scrpit/NotifyLibrary.luau"))()
+```
 
 StarLight Asset
 
