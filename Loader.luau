@@ -1,4 +1,4 @@
-local BASE_URL = "https://raw.githubusercontent.com/StarLight-scrpit/StarLight-Asset/refs/heads/main/Scrpit/"
+local BASE_URL = "https://raw.githubusercontent.com/StarLight-scrpit/StarLight-Asset/refs/heads/main/Script/"
 local files = {"AntiLag.luau", "EspLibrary.luau", "NotifyLibrary.luau"}
 local loaded = {}
 
