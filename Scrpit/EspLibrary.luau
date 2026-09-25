@@ -41,6 +41,9 @@ local Config = {
     BoxColor = Color3.fromRGB(255, 255, 255),
     UseElementColorForBox = true,
     CornerLength = 10,
+    Box3DThickness = 1,
+    Box3DTransparency = 0.5,
+    Box3DColor = Color3.fromRGB(255, 255, 255),
 
     Tracers = false,
     TracerAnchor = "Bottom",
@@ -63,6 +66,20 @@ local Config = {
     DistanceSuffix = " studs",
     DistanceSizeRatio = 1,
     MaxDistance = 1000,
+    ShowName = true,
+    ShowHealth = false,
+    ShowHealthBar = false,
+    HealthBarWidth = 2,
+    DynamicHealthColor = true,
+
+    Skeleton = false,
+    SkeletonColor = Color3.fromRGB(255, 255, 255),
+    SkeletonThickness = 1,
+    SkeletonTransparency = 0.2,
+
+    TeamCheck = false,
+    VisibleCheck = false,
+    AliveCheck = true,
 }
 
 local State = {
@@ -101,7 +118,9 @@ Gui.Parent = Host
 
 local HighlightBucket = Folder(Gui)
 local BoxBucket = Folder(Gui)
+local Box3DBucket = Folder(Gui)
 local LabelBucket = Folder(Gui)
+local HealthBarBucket = Folder(Gui)
 
 local TracerLayer = Instance.new("Frame")
 TracerLayer.Name = Tag()
@@ -155,6 +174,41 @@ local function HorizontalRelative(pos)
     return Vector2.new(rel.X, rel.Z)
 end
 
+local function HealthColor(humanoid)
+    if not humanoid then return Color3.fromRGB(0, 255, 0) end
+    local ratio = math.clamp(humanoid.Health / math.max(humanoid.MaxHealth, 1), 0, 1)
+    local r = (1 - ratio) * 255
+    local g = ratio * 255
+    return Color3.fromRGB(math.floor(r), math.floor(g), 0)
+end
+
+local function GetCharacterParts(character)
+    if not character then return nil end
+    return {
+        Head = character:FindFirstChild("Head"),
+        UpperTorso = character:FindFirstChild("UpperTorso"),
+        LowerTorso = character:FindFirstChild("LowerTorso"),
+        Torso = character:FindFirstChild("Torso"),
+        HumanoidRootPart = character:FindFirstChild("HumanoidRootPart"),
+        LeftUpperArm = character:FindFirstChild("LeftUpperArm"),
+        LeftLowerArm = character:FindFirstChild("LeftLowerArm"),
+        LeftHand = character:FindFirstChild("LeftHand"),
+        RightUpperArm = character:FindFirstChild("RightUpperArm"),
+        RightLowerArm = character:FindFirstChild("RightLowerArm"),
+        RightHand = character:FindFirstChild("RightHand"),
+        LeftUpperLeg = character:FindFirstChild("LeftUpperLeg"),
+        LeftLowerLeg = character:FindFirstChild("LeftLowerLeg"),
+        LeftFoot = character:FindFirstChild("LeftFoot"),
+        RightUpperLeg = character:FindFirstChild("RightUpperLeg"),
+        RightLowerLeg = character:FindFirstChild("RightLowerLeg"),
+        RightFoot = character:FindFirstChild("RightFoot"),
+        ["Left Arm"] = character:FindFirstChild("Left Arm"),
+        ["Right Arm"] = character:FindFirstChild("Right Arm"),
+        ["Left Leg"] = character:FindFirstChild("Left Leg"),
+        ["Right Leg"] = character:FindFirstChild("Right Leg"),
+    }
+end
+
 local Element = {}
 Element.__index = Element
 
@@ -169,9 +223,12 @@ function Element.new(object, text, color)
     self:_BuildHighlight()
     self:_BuildBox()
     self:_BuildCorner()
+    self:_BuildBox3D()
     self:_BuildLabel()
+    self:_BuildHealthBar()
     self:_BuildTracer()
     self:_BuildArrow()
+    self:_BuildSkeleton()
 
     self:Enter()
     return self
@@ -241,6 +298,18 @@ function Element:_BuildCorner()
     }
 end
 
+function Element:_BuildBox3D()
+    local box = Instance.new("SelectionBox")
+    box.Name = Tag()
+    box.Adornee = self.Object
+    box.LineThickness = Config.Box3DThickness
+    box.Transparency = Config.Box3DTransparency
+    box.Color3 = Config.Box3DColor
+    box.Visible = false
+    box.Parent = Box3DBucket
+    self.Box3D = box
+end
+
 function Element:_BuildLabel()
     local frame = Instance.new("Frame")
     frame.Name = Tag()
@@ -265,6 +334,26 @@ function Element:_BuildLabel()
 
     self.LabelFrame = frame
     self.Label = lbl
+end
+
+function Element:_BuildHealthBar()
+    local bg = Instance.new("Frame")
+    bg.Name = Tag()
+    bg.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    bg.BackgroundTransparency = 0.4
+    bg.BorderSizePixel = 0
+    bg.Visible = false
+    bg.Parent = HealthBarBucket
+
+    local fill = Instance.new("Frame")
+    fill.Name = Tag()
+    fill.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+    fill.BorderSizePixel = 0
+    fill.Visible = false
+    fill.Parent = bg
+
+    self.HealthBarBg = bg
+    self.HealthBarFill = fill
 end
 
 function Element:_BuildTracer()
@@ -305,6 +394,51 @@ function Element:_BuildArrow()
     end
 end
 
+function Element:_BuildSkeleton()
+    local lines = {}
+    local connections = {
+        { "Head", "UpperTorso" },
+        { "Head", "Torso" },
+        { "UpperTorso", "LowerTorso" },
+        { "UpperTorso", "LeftUpperArm" },
+        { "LeftUpperArm", "LeftLowerArm" },
+        { "LeftLowerArm", "LeftHand" },
+        { "UpperTorso", "RightUpperArm" },
+        { "RightUpperArm", "RightLowerArm" },
+        { "RightLowerArm", "RightHand" },
+        { "LowerTorso", "LeftUpperLeg" },
+        { "LeftUpperLeg", "LeftLowerLeg" },
+        { "LeftLowerLeg", "LeftFoot" },
+        { "LowerTorso", "RightUpperLeg" },
+        { "RightUpperLeg", "RightLowerLeg" },
+        { "RightLowerLeg", "RightFoot" },
+        { "Torso", "Left Arm" },
+        { "Torso", "Right Arm" },
+        { "Torso", "Left Leg" },
+        { "Torso", "Right Leg" },
+    }
+
+    for _, conn in ipairs(connections) do
+        local line = Instance.new("Frame")
+        line.Name = Tag()
+        line.BackgroundTransparency = 1
+        line.BorderSizePixel = 0
+        line.Visible = false
+        line.Parent = BoxBucket
+
+        local stroke = Instance.new("UIStroke")
+        stroke.Name = Tag()
+        stroke.Thickness = Config.SkeletonThickness
+        stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+        stroke.Transparency = Config.SkeletonTransparency
+        stroke.Parent = line
+
+        table.insert(lines, { line, stroke, conn[1], conn[2] })
+    end
+
+    self.SkeletonLines = lines
+end
+
 function Element:Enter()
     Fade(self.Highlight, { FillTransparency = Config.FillTransparency })
     Fade(self.Highlight, { OutlineTransparency = Config.OutlineTransparency })
@@ -331,8 +465,15 @@ function Element:Leave()
         self.ArrowTriangle.Visible = false
     end
 
-    if self.BoxFrame then self.BoxFrame.Visible = false end
-    if self.CornerFrame then self.CornerFrame.Visible = false end
+    self.BoxFrame.Visible = false
+    self.CornerFrame.Visible = false
+    self.Box3D.Visible = false
+    self.HealthBarBg.Visible = false
+    self.HealthBarFill.Visible = false
+
+    for _, data in ipairs(self.SkeletonLines) do
+        data[1].Visible = false
+    end
 
     task.delay(Config.FadeTime + 0.05, function()
         if not self.Active then
@@ -345,12 +486,19 @@ function Element:Destroy()
     if self.Highlight then self.Highlight:Destroy() end
     if self.BoxFrame then self.BoxFrame:Destroy() end
     if self.CornerFrame then self.CornerFrame:Destroy() end
+    if self.Box3D then self.Box3D:Destroy() end
     if self.LabelFrame then self.LabelFrame:Destroy() end
+    if self.HealthBarBg then self.HealthBarBg:Destroy() end
     if self.Tracer then self.Tracer:Destroy() end
     if self.ArrowImage then self.ArrowImage:Destroy() end
     if self.ArrowTriangle then
         pcall(function() self.ArrowTriangle:Remove() end)
         self.ArrowTriangle = nil
+    end
+    if self.SkeletonLines then
+        for _, data in ipairs(self.SkeletonLines) do
+            data[1]:Destroy()
+        end
     end
     State.Elements[self.Object] = nil
 end
@@ -412,11 +560,24 @@ end
 
 local function RefreshBox(el, obj, color)
     local style = Config.ESPStyle
-    if style ~= "Box" and style ~= "Corner" then
+    if style ~= "Box" and style ~= "Corner" and style ~= "Box3D" then
         el.BoxFrame.Visible = false
         el.CornerFrame.Visible = false
+        el.Box3D.Visible = false
         return
     end
+
+    if style == "Box3D" then
+        el.BoxFrame.Visible = false
+        el.CornerFrame.Visible = false
+        el.Box3D.Visible = true
+        el.Box3D.Color3 = ResolveBoxColor(color)
+        el.Box3D.LineThickness = Config.Box3DThickness
+        el.Box3D.Transparency = Config.Box3DTransparency
+        return
+    end
+
+    el.Box3D.Visible = false
 
     local x, y, w, h = ProjectBoundingBox(obj)
     if not x then
@@ -480,6 +641,108 @@ local function RefreshBox(el, obj, color)
 
         setLine(C.BR_H, UDim2.new(1, -cl, 1, -t), UDim2.fromOffset(cl, t))
         setLine(C.BR_V, UDim2.new(1, -t, 1, -cl), UDim2.fromOffset(t, cl))
+    end
+end
+
+local function RefreshHealthBar(el, obj)
+    if not Config.ShowHealthBar then
+        el.HealthBarBg.Visible = false
+        el.HealthBarFill.Visible = false
+        return
+    end
+
+    local humanoid = obj:FindFirstChildOfClass("Humanoid")
+    if not humanoid then
+        el.HealthBarBg.Visible = false
+        el.HealthBarFill.Visible = false
+        return
+    end
+
+    local x, y, w, h = ProjectBoundingBox(obj)
+    if not x then
+        el.HealthBarBg.Visible = false
+        el.HealthBarFill.Visible = false
+        return
+    end
+
+    local barW = Config.HealthBarWidth
+    local barH = h
+    local barX = x - barW - 4
+    local barY = y
+
+    el.HealthBarBg.Visible = true
+    el.HealthBarBg.Position = UDim2.fromOffset(barX, barY)
+    el.HealthBarBg.Size = UDim2.fromOffset(barW, barH)
+
+    local ratio = math.clamp(humanoid.Health / math.max(humanoid.MaxHealth, 1), 0, 1)
+    local fillH = barH * ratio
+
+    el.HealthBarFill.Visible = true
+    el.HealthBarFill.Position = UDim2.fromOffset(0, barH - fillH)
+    el.HealthBarFill.Size = UDim2.fromOffset(barW, fillH)
+    el.HealthBarFill.BackgroundColor3 = Config.DynamicHealthColor
+        and HealthColor(humanoid)
+        or Color3.fromRGB(0, 255, 0)
+end
+
+local function RefreshSkeleton(el, obj)
+    if not Config.Skeleton then
+        for _, data in ipairs(el.SkeletonLines) do
+            data[1].Visible = false
+        end
+        return
+    end
+
+    local character = obj:IsA("Model") and obj or obj.Parent
+    if not character or not character:IsA("Model") then
+        for _, data in ipairs(el.SkeletonLines) do
+            data[1].Visible = false
+        end
+        return
+    end
+
+    local parts = GetCharacterParts(character)
+    if not parts then
+        for _, data in ipairs(el.SkeletonLines) do
+            data[1].Visible = false
+        end
+        return
+    end
+
+    local color = Config.SkeletonColor
+
+    for _, data in ipairs(el.SkeletonLines) do
+        local line, stroke, boneA, boneB = data[1], data[2], data[3], data[4]
+        local partA = parts[boneA]
+        local partB = parts[boneB]
+
+        if partA and partB then
+            local posA = partA.Position
+            local posB = partB.Position
+            local spA, onA = State.Camera:WorldToViewportPoint(posA)
+            local spB, onB = State.Camera:WorldToViewportPoint(posB)
+
+            if onA and onB and spA.Z > 0 and spB.Z > 0 then
+                local screenA = Vector2.new(spA.X, spA.Y)
+                local screenB = Vector2.new(spB.X, spB.Y)
+                local mid = (screenA + screenB) / 2
+                local len = (screenA - screenB).Magnitude
+                local ang = math.deg(math.atan2(screenB.Y - screenA.Y, screenB.X - screenA.X))
+
+                line.Position = UDim2.fromOffset(mid.X, mid.Y)
+                line.Size = UDim2.new(0, len, 0, 1)
+                line.Rotation = ang
+                line.BackgroundColor3 = color
+                line.Visible = true
+                stroke.Color = color
+                stroke.Thickness = Config.SkeletonThickness
+                stroke.Transparency = Config.SkeletonTransparency
+            else
+                line.Visible = false
+            end
+        else
+            line.Visible = false
+        end
     end
 end
 
@@ -548,10 +811,82 @@ local function RefreshArrowTriangle(el, pos, color)
     el.ArrowTriangle.Visible = true
 end
 
+local function IsTeammate(obj)
+    if not Config.TeamCheck then return false end
+    if not obj then return false end
+    local player
+    if obj:IsA("Model") then
+        player = Players:GetPlayerFromCharacter(obj)
+    else
+        player = Players:GetPlayerFromCharacter(obj.Parent)
+    end
+    if not player or player == LocalPlayer then return false end
+    if not player.Team or not LocalPlayer.Team then return false end
+    return player.Team == LocalPlayer.Team
+end
+
+local function IsVisible(obj)
+    if not Config.VisibleCheck then return true end
+    local character = obj:IsA("Model") and obj or obj.Parent
+    if not character or not character:IsA("Model") then return true end
+
+    local head = character:FindFirstChild("Head")
+    local target = head or character.PrimaryPart
+    if not target then return true end
+
+    local origin = State.Camera.CFrame.Position
+    local direction = target.Position - origin
+
+    local filter = {}
+    if LocalPlayer.Character then
+        table.insert(filter, LocalPlayer.Character)
+    end
+    table.insert(filter, character)
+
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances = filter
+    params.IgnoreWater = true
+
+    local result = Workspace:Raycast(origin, direction, params)
+    return result == nil
+end
+
+local function IsAlive(obj)
+    if not Config.AliveCheck then return true end
+    local character = obj:IsA("Model") and obj or obj.Parent
+    if not character or not character:IsA("Model") then return true end
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return true end
+    return humanoid.Health > 0
+end
+
+local function HideAll(el)
+    el.Highlight.Enabled = false
+    el.LabelFrame.Visible = false
+    el.Tracer.Visible = false
+    el.ArrowImage.Visible = false
+    if el.ArrowTriangle then el.ArrowTriangle.Visible = false end
+    el.BoxFrame.Visible = false
+    el.CornerFrame.Visible = false
+    el.Box3D.Visible = false
+    el.HealthBarBg.Visible = false
+    el.HealthBarFill.Visible = false
+    for _, data in ipairs(el.SkeletonLines) do
+        data[1].Visible = false
+    end
+    el.Visible = false
+end
+
 local function Refresh(el)
     local obj = el.Object
     if not obj or not obj:IsDescendantOf(game) then
         el:Leave()
+        return
+    end
+
+    if IsTeammate(obj) or not IsAlive(obj) or not IsVisible(obj) then
+        HideAll(el)
         return
     end
 
@@ -564,14 +899,7 @@ local function Refresh(el)
     end
 
     if not onScreen then
-        el.Highlight.Enabled = false
-        el.LabelFrame.Visible = false
-        el.Tracer.Visible = false
-        el.ArrowImage.Visible = false
-        if el.ArrowTriangle then el.ArrowTriangle.Visible = false end
-        el.BoxFrame.Visible = false
-        el.CornerFrame.Visible = false
-        el.Visible = false
+        HideAll(el)
         return
     end
 
@@ -590,6 +918,8 @@ local function Refresh(el)
     end
 
     RefreshBox(el, obj, color)
+    RefreshHealthBar(el, obj)
+    RefreshSkeleton(el, obj)
 
     el.LabelFrame.Visible = true
     el.LabelFrame.Position = UDim2.fromOffset(screen.X, screen.Y)
@@ -600,15 +930,22 @@ local function Refresh(el)
         el.Label.TextTransparency = Config.TextTransparency
         el.Label.TextStrokeTransparency = Config.TextStrokeTransparency
     end
+
+    local lines = {}
+    if Config.ShowName then
+        table.insert(lines, el.Text)
+    end
+    if Config.ShowHealth then
+        local humanoid = obj:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            table.insert(lines, string.format("%d/%d", math.floor(humanoid.Health), math.floor(humanoid.MaxHealth)))
+        end
+    end
     if Config.ShowDistance then
         local s = math.round(Config.TextSize * Config.DistanceSizeRatio)
-        el.Label.Text = string.format(
-            '%s\n<font size="%d">[%d%s]</font>',
-            el.Text, s, math.floor(dist), Config.DistanceSuffix
-        )
-    else
-        el.Label.Text = el.Text
+        table.insert(lines, string.format('<font size="%d">[%d%s]</font>', s, math.floor(dist), Config.DistanceSuffix))
     end
+    el.Label.Text = table.concat(lines, "\n")
 
     if Config.Tracers then
         local vp = State.Camera.ViewportSize
@@ -676,7 +1013,7 @@ end)
 local API = {}
 API.Config = Config
 API.Anchors = Anchors
-API.Styles = { "Highlight", "Box", "Corner" }
+API.Styles = { "Highlight", "Box", "Corner", "Box3D" }
 
 function API:Add(object, text, color)
     if State.Unloaded then return end
@@ -707,7 +1044,7 @@ function API:Update(object, text, color)
 end
 
 function API:SetESPStyle(style)
-    if style ~= "Highlight" and style ~= "Box" and style ~= "Corner" then return end
+    if style ~= "Highlight" and style ~= "Box" and style ~= "Corner" and style ~= "Box3D" then return end
     Config.ESPStyle = style
 end
 
@@ -716,6 +1053,9 @@ function API:SetBoxTransparency(n) Config.BoxTransparency = n end
 function API:SetBoxColor(c) Config.BoxColor = c end
 function API:SetUseElementColorForBox(v) Config.UseElementColorForBox = v end
 function API:SetCornerLength(n) Config.CornerLength = n end
+function API:SetBox3DThickness(n) Config.Box3DThickness = n end
+function API:SetBox3DTransparency(n) Config.Box3DTransparency = n end
+function API:SetBox3DColor(c) Config.Box3DColor = c end
 
 function API:SetTextSize(n) Config.TextSize = n end
 function API:SetFont(f) Config.Font = f end
@@ -764,6 +1104,21 @@ function API:SetShowDistance(v) Config.ShowDistance = v end
 function API:SetDistanceSuffix(s) Config.DistanceSuffix = s end
 function API:SetDistanceSizeRatio(n) Config.DistanceSizeRatio = n end
 function API:SetMaxDistance(n) Config.MaxDistance = n end
+function API:SetShowName(v) Config.ShowName = v end
+function API:SetShowHealth(v) Config.ShowHealth = v end
+function API:SetShowHealthBar(v) Config.ShowHealthBar = v end
+function API:SetHealthBarWidth(n) Config.HealthBarWidth = n end
+function API:SetDynamicHealthColor(v) Config.DynamicHealthColor = v end
+
+function API:SetSkeleton(v) Config.Skeleton = v end
+function API:SetSkeletonColor(c) Config.SkeletonColor = c end
+function API:SetSkeletonThickness(n) Config.SkeletonThickness = n end
+function API:SetSkeletonTransparency(n) Config.SkeletonTransparency = n end
+
+function API:SetTeamCheck(v) Config.TeamCheck = v end
+function API:SetVisibleCheck(v) Config.VisibleCheck = v end
+function API:SetAliveCheck(v) Config.AliveCheck = v end
+
 function API:SetFadeTime(n) Config.FadeTime = n end
 function API:SetRenderRate(n) Config.RenderRate = n end
 
