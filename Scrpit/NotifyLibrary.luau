@@ -614,6 +614,157 @@ local function trophypush_async(o)
     trophytick()
 end
 
+local native = {
+    root   = nil,
+    width  = 460,
+    height = 110,
+    gap    = 12,
+    pad    = 20,
+}
+
+local function nativeroot()
+    if native.root and native.root.Parent then return native.root end
+    local g = makescreen("NkitNative")
+
+    local holder = Instance.new("Frame")
+    holder.Name = "Holder"
+    holder.BackgroundTransparency = 1
+    holder.AnchorPoint = Vector2.new(1, 0)
+    holder.Position = UDim2.new(1, -native.pad, 0, native.pad)
+    holder.Size = UDim2.new(0, native.width, 1, -native.pad * 2)
+    holder.Parent = g
+
+    local cam = workspace.CurrentCamera
+    local scale = Instance.new("UIScale")
+    scale.Scale = math.clamp(cam.ViewportSize.X / 1280, 0.65, 1)
+    scale.Parent = holder
+
+    local list = Instance.new("UIListLayout")
+    list.Padding = UDim.new(0, native.gap)
+    list.SortOrder = Enum.SortOrder.LayoutOrder
+    list.HorizontalAlignment = Enum.HorizontalAlignment.Right
+    list.VerticalAlignment = Enum.VerticalAlignment.Top
+    list.Parent = holder
+
+    native.root = holder
+    return holder
+end
+
+local function nativecard(o)
+    local col     = o.Color or base.color.pure
+    local surface = o.BackgroundColor or Color3.fromRGB(22, 22, 28)
+    local ink     = o.FontColor or Color3.fromRGB(245, 245, 245)
+    local subink  = o.DescriptionColor or Color3.fromRGB(170, 170, 180)
+
+    local card = Instance.new("Frame")
+    card.Name = "Native"
+    card.BackgroundTransparency = 1
+    card.Size = UDim2.new(1, 0, 0, 0)
+    card.ClipsDescendants = true
+    card.LayoutOrder = math.floor(tick() * 1000) % 100000
+    card.Parent = nativeroot()
+
+    local body = Instance.new("Frame")
+    body.Name = "Frame"
+    body.Size = UDim2.new(1, 0, 0, native.height)
+    body.Position = UDim2.new(1.1, 0, 0, 0)
+    body.BackgroundColor3 = surface
+    body.BackgroundTransparency = 0.12
+    body.BorderSizePixel = 0
+    body.Parent = card
+    round(body, 10)
+    border(body, col, 2, 0.35)
+
+    local glow = Instance.new("ImageLabel")
+    glow.Name = "Glow"
+    glow.BackgroundTransparency = 1
+    glow.Image = base.icon.halo
+    glow.ImageColor3 = col
+    glow.ImageTransparency = 0.35
+    glow.Size = UDim2.new(1.4, 0, 3, 0)
+    glow.Position = UDim2.new(-0.2, 0, 0.5, 0)
+    glow.AnchorPoint = Vector2.new(0, 0.5)
+    glow.ZIndex = 0
+    glow.Parent = body
+
+    local icon = Instance.new("ImageLabel")
+    icon.Name = "ImageLabel"
+    icon.BackgroundTransparency = 1
+    icon.Position = UDim2.new(0, 16, 0.5, -32)
+    icon.Size = UDim2.new(0, 64, 0, 64)
+    icon.ScaleType = Enum.ScaleType.Fit
+    local im = resimage(o.Image or "")
+    icon.Image = im ~= "" and im or base.icon.main
+    icon.ImageColor3 = o.IconColor or Color3.new(1, 1, 1)
+    icon.Parent = body
+
+    local tag = Instance.new("TextLabel")
+    tag.Name = "TextLabel"
+    tag.BackgroundTransparency = 1
+    tag.Position = UDim2.new(0, 96, 0, 12)
+    tag.Size = UDim2.new(1, -112, 0, 14)
+    tag.Font = Enum.Font.GothamBold
+    tag.TextSize = 12
+    tag.TextColor3 = col
+    tag.TextXAlignment = Enum.TextXAlignment.Left
+    tag.Text = o.Style or "NOTIFICATION"
+    tag.TextTruncate = Enum.TextTruncate.AtEnd
+    tag.Parent = body
+
+    local details = Instance.new("Frame")
+    details.Name = "Details"
+    details.BackgroundTransparency = 1
+    details.Position = UDim2.new(0, 96, 0, 30)
+    details.Size = UDim2.new(1, -112, 0, 70)
+    details.Parent = body
+
+    local function field(name, y, h, size, color, font)
+        local l = Instance.new("TextLabel")
+        l.Name = name
+        l.BackgroundTransparency = 1
+        l.Position = UDim2.new(0, 0, 0, y)
+        l.Size = UDim2.new(1, 0, 0, h)
+        l.Font = font
+        l.TextSize = size
+        l.TextColor3 = color
+        l.TextXAlignment = Enum.TextXAlignment.Left
+        l.TextYAlignment = Enum.TextYAlignment.Top
+        l.TextWrapped = true
+        l.TextTruncate = Enum.TextTruncate.AtEnd
+        l.Parent = details
+        return l
+    end
+
+    field("Title",  0,  24, 18, ink,    Enum.Font.GothamBold).Text   = o.Title or "Achievement"
+    field("Desc",  26,  20, 14, subink, Enum.Font.GothamMedium).Text = o.Description or ""
+    field("Reason",46,  20, 12, subink, Enum.Font.Gotham).Text       = o.Reason or ""
+
+    return card, body, glow
+end
+
+local function dispatch_native(o)
+    local card, body, glow = nativecard(o)
+
+    playsound(card, resound(o.Sound, base.sound.extra), 1)
+
+    glide(card, { Size = UDim2.new(1, 0, 0, native.height) }, 0.8,
+        Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    glide(body, { Position = UDim2.new(0, 0, 0, 0) }, 0.5,
+        Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    glide(glow, { ImageTransparency = 1 }, 1.2,
+        Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+
+    task.delay(o.Time or 5, function()
+        glide(body, { Position = UDim2.new(1.1, 0, 0, 0) }, 0.5,
+            Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+        task.wait(0.5)
+        glide(card, { Size = UDim2.new(1, 0, 0, 0) }, 0.5,
+            Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
+        task.wait(0.55)
+        if card.Parent then card:Destroy() end
+    end)
+end
+
 local function dispatch_console(o)
     if not (Library and Library.Notify) then
         warn("[nkit] Library is not initialized")
@@ -625,55 +776,6 @@ local function dispatch_console(o)
         Description = o.Description or "No Description",
         Time = o.Time or 5,
     })
-end
-
-local function dispatch_native(o)
-    local pg = me:WaitForChild("PlayerGui")
-    local root = pg:FindFirstChild("GlobalUI") or pg:FindFirstChild("MainUI")
-    if not root then
-        warn("[nkit] Missing GlobalUI/MainUI")
-        return
-    end
-    local holder = root:FindFirstChild("AchievementsHolder")
-    if not holder then
-        warn("[nkit] Missing AchievementsHolder")
-        return
-    end
-
-    local a = holder.Achievement:Clone()
-    a.Size = UDim2.new(0, 0, 0, 0)
-    a.Frame.Position = UDim2.new(1.1, 0, 0, 0)
-    a.Name = "NkitEntry"
-    a.Visible = true
-
-    a.Frame.TextLabel.Text = o.Style or "NOTIFICATION"
-    a.Frame.Details.Title.Text = o.Title or "No Title"
-    a.Frame.Details.Desc.Text = o.Description or "No Description"
-    a.Frame.Details.Reason.Text = o.Reason or ""
-
-    local im = resimage(o.Image or "")
-    a.Frame.ImageLabel.Image = im ~= "" and im or base.icon.main
-
-    local col = o.Color or Color3.new(1, 1, 1)
-    a.Frame.TextLabel.TextColor3 = col
-    a.Frame.UIStroke.Color = col
-    a.Frame.Glow.ImageColor3 = col
-    a.Parent = holder
-
-    playsound(holder, resound(o.Sound, base.sound.extra), 1)
-
-    task.spawn(function()
-        a:TweenSize(UDim2.new(1, 0, 0.2, 0), "In", "Quad", 0.8, true)
-        task.wait(0.8)
-        a.Frame:TweenPosition(UDim2.new(0, 0, 0, 0), "Out", "Quad", 0.5, true)
-        glide(a.Frame.Glow, { ImageTransparency = 1 }, 1, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-        task.wait(o.Time or 5)
-        a.Frame:TweenPosition(UDim2.new(1.1, 0, 0, 0), "In", "Quad", 0.5, true)
-        task.wait(0.5)
-        a:TweenSize(UDim2.new(1, 0, -0.1, 0), "InOut", "Quad", 0.5, true)
-        task.wait(0.5)
-        if a.Parent then a:Destroy() end
-    end)
 end
 
 local function dispatch_system(o)
