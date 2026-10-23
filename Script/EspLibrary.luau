@@ -103,14 +103,14 @@ Gui.Parent = host
 local TracerLayer = Instance.new("Frame")
 TracerLayer.Size = UDim2.fromScale(1, 1)
 TracerLayer.BackgroundTransparency = 1
-TracerLayer.Visible = false
+TracerLayer.Visible = true
 TracerLayer.ZIndex = 5
 TracerLayer.Parent = Gui
 
 local ArrowLayer = Instance.new("Frame")
 ArrowLayer.Size = UDim2.fromScale(1, 1)
 ArrowLayer.BackgroundTransparency = 1
-ArrowLayer.Visible = false
+ArrowLayer.Visible = true
 ArrowLayer.ZIndex = 5
 ArrowLayer.Parent = Gui
 
@@ -273,6 +273,7 @@ local function makeElement(obj, text, color)
     e.tracer.Name = newId()
     e.tracer.AnchorPoint = Vector2.new(0.5, 0.5)
     e.tracer.BackgroundTransparency = 1
+    e.tracer.Visible = false
     e.tracer.Parent = TracerLayer
 
     e.tracerStroke = Instance.new("UIStroke")
@@ -283,6 +284,7 @@ local function makeElement(obj, text, color)
 
     e.arrow = ArrowProto:Clone()
     e.arrow.Name = newId()
+    e.arrow.Visible = false
     e.arrow.Parent = ArrowLayer
 
     if DrawingAPI then
@@ -484,10 +486,17 @@ local function refreshArrowImage(e, screen, pos, color)
     local vp = camera.ViewportSize
     local center = vp / 2
 
-    local toObj = (pos - camera.CFrame.Position).Unit
-    local dir = Vector2.new(screen.X, screen.Y) - center
-    if camera.CFrame.LookVector:Dot(toObj) < 0 then
-        dir = -dir
+    local rel = pos - camera.CFrame.Position
+    local dir
+    if screen.Z > 0 then
+        dir = Vector2.new(screen.X, screen.Y) - center
+        if dir.Magnitude < 1e-4 then
+            local camRel = camera.CFrame:VectorToObjectSpace(rel)
+            dir = Vector2.new(camRel.X, -camRel.Y)
+        end
+    else
+        local camRel = camera.CFrame:VectorToObjectSpace(rel)
+        dir = Vector2.new(camRel.X, -camRel.Y)
     end
 
     if dir.Magnitude < 1e-4 then
@@ -569,9 +578,10 @@ local function refresh(e)
     local dist = (camera.CFrame.Position - pos).Magnitude
 
     if Config.MaxDistance > 0 and dist > Config.MaxDistance then
-        hideElement(e)
-        return
+        onScreen = false
     end
+
+    local color = Config.Rainbow and rainbowColor or e.color
 
     if not onScreen then
         e.hl.Enabled = false
@@ -586,7 +596,6 @@ local function refresh(e)
         e.hpFill.Visible = false
         e.visible = false
 
-        local color = Config.Rainbow and rainbowColor or e.color
         if Config.Arrows then
             if Config.ArrowStyle == "Triangle" and e.tri then
                 e.arrow.Visible = false
@@ -603,7 +612,6 @@ local function refresh(e)
     end
 
     e.visible = true
-    local color = Config.Rainbow and rainbowColor or e.color
     local style = resolveStyle()
 
     e.arrow.Visible = false
