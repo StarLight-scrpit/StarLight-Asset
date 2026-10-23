@@ -37,16 +37,15 @@ local Config = {
     OutlineTransparency = 0,
     OutlineColor = Color3.fromRGB(255, 255, 255),
     MatchColors = true,
+    DepthMode = Enum.HighlightDepthMode.AlwaysOnTop,
 
     RenderRate = 60,
     Rainbow = false,
 
     ESPStyle = "Highlight",
-
-    BoxThickness = 1,
-    BoxTransparency = 0,
-    BoxColor = Color3.fromRGB(255, 255, 255),
-    UseElementColorForBox = true,
+    AdornmentColor = Color3.fromRGB(255, 255, 255),
+    AdornmentTransparency = 0.5,
+    UseElementColorForAdornment = true,
 
     Tracers = false,
     TracerAnchor = "Bottom",
@@ -115,6 +114,10 @@ ArrowLayer.Visible = false
 ArrowLayer.ZIndex = 5
 ArrowLayer.Parent = Gui
 
+local AdornLayer = Instance.new("Folder")
+AdornLayer.Name = "esp_adorn_" .. tostring(math.random(100000, 999999))
+AdornLayer.Parent = Workspace
+
 local ArrowProto = Instance.new("ImageLabel")
 ArrowProto.Name = "arrow_proto"
 ArrowProto.Image = "rbxassetid://16368985219"
@@ -157,6 +160,60 @@ local function healthColor(hum)
     return Color3.fromRGB(math.floor((1 - r) * 255), math.floor(r * 255), 0)
 end
 
+local function getObjectSize(obj)
+    if obj:IsA("Model") then
+        local ok, _, size = pcall(function() return obj:GetBoundingBox() end)
+        if ok and size and size.Magnitude > 0 then return size end
+        local pp = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
+        if pp then return pp.Size end
+    elseif obj:IsA("BasePart") then
+        return obj.Size
+    end
+    return Vector3.new(4, 5, 2)
+end
+
+local function makeAdornments(obj, parent)
+    local size = getObjectSize(obj)
+    local adorns = {}
+
+    adorns.box = Instance.new("BoxHandleAdornment")
+    adorns.box.Name = newId()
+    adorns.box.Adornee = obj
+    adorns.box.Size = size
+    adorns.box.AlwaysOnTop = true
+    adorns.box.ZIndex = 10
+    adorns.box.Color3 = Color3.new(1, 1, 1)
+    adorns.box.Transparency = 0.5
+    adorns.box.Visible = false
+    adorns.box.Parent = parent
+
+    adorns.sphere = Instance.new("SphereHandleAdornment")
+    adorns.sphere.Name = newId()
+    adorns.sphere.Adornee = obj
+    adorns.sphere.Radius = size.X * 1.085
+    adorns.sphere.AlwaysOnTop = true
+    adorns.sphere.ZIndex = 10
+    adorns.sphere.Color3 = Color3.new(1, 1, 1)
+    adorns.sphere.Transparency = 0.5
+    adorns.sphere.Visible = false
+    adorns.sphere.Parent = parent
+
+    adorns.cylinder = Instance.new("CylinderHandleAdornment")
+    adorns.cylinder.Name = newId()
+    adorns.cylinder.Adornee = obj
+    adorns.cylinder.Height = size.Y * 2
+    adorns.cylinder.Radius = size.X * 1.085
+    adorns.cylinder.CFrame = CFrame.new() * CFrame.Angles(math.rad(90), 0, 0)
+    adorns.cylinder.AlwaysOnTop = true
+    adorns.cylinder.ZIndex = 10
+    adorns.cylinder.Color3 = Color3.new(1, 1, 1)
+    adorns.cylinder.Transparency = 0.5
+    adorns.cylinder.Visible = false
+    adorns.cylinder.Parent = parent
+
+    return adorns
+end
+
 local function makeElement(obj, text, color)
     local e = {
         obj = obj,
@@ -168,29 +225,14 @@ local function makeElement(obj, text, color)
 
     e.hl = Instance.new("Highlight")
     e.hl.Name = newId()
-    e.hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    e.hl.DepthMode = Config.DepthMode
     e.hl.Adornee = obj
     e.hl.FillTransparency = 1
     e.hl.OutlineTransparency = 1
     e.hl.Enabled = false
     e.hl.Parent = Gui
 
-    e.box = Instance.new("Frame")
-    e.box.Name = newId()
-    e.box.BackgroundTransparency = 1
-    e.box.BorderSizePixel = 0
-    e.box.Visible = false
-    e.box.Parent = Gui
-
-    e.boxTop    = Instance.new("Frame"); e.boxTop.Parent = e.box
-    e.boxBottom = Instance.new("Frame"); e.boxBottom.Parent = e.box
-    e.boxLeft   = Instance.new("Frame"); e.boxLeft.Parent = e.box
-    e.boxRight  = Instance.new("Frame"); e.boxRight.Parent = e.box
-    for _, l in ipairs({ e.boxTop, e.boxBottom, e.boxLeft, e.boxRight }) do
-        l.Name = newId()
-        l.BorderSizePixel = 0
-        l.BackgroundTransparency = 1
-    end
+    e.adorns = makeAdornments(obj, AdornLayer)
 
     e.labelFrame = Instance.new("Frame")
     e.labelFrame.Name = newId()
@@ -262,7 +304,11 @@ end
 
 local function destroyElement(e)
     if e.hl then e.hl:Destroy() end
-    if e.box then e.box:Destroy() end
+    if e.adorns then
+        if e.adorns.box then e.adorns.box:Destroy() end
+        if e.adorns.sphere then e.adorns.sphere:Destroy() end
+        if e.adorns.cylinder then e.adorns.cylinder:Destroy() end
+    end
     if e.labelFrame then e.labelFrame:Destroy() end
     if e.hpBg then e.hpBg:Destroy() end
     if e.tracer then e.tracer:Destroy() end
@@ -283,8 +329,11 @@ local function leaveElement(e)
     fade(e.arrow, { ImageTransparency = 1 })
 
     if e.tri then e.tri.Visible = false end
-
-    e.box.Visible = false
+    if e.adorns then
+        if e.adorns.box then e.adorns.box.Visible = false end
+        if e.adorns.sphere then e.adorns.sphere.Visible = false end
+        if e.adorns.cylinder then e.adorns.cylinder.Visible = false end
+    end
     e.hpBg.Visible = false
     e.hpFill.Visible = false
 
@@ -299,13 +348,17 @@ local function hideElement(e)
     e.tracer.Visible = false
     e.arrow.Visible = false
     if e.tri then e.tri.Visible = false end
-    e.box.Visible = false
+    if e.adorns then
+        if e.adorns.box then e.adorns.box.Visible = false end
+        if e.adorns.sphere then e.adorns.sphere.Visible = false end
+        if e.adorns.cylinder then e.adorns.cylinder.Visible = false end
+    end
     e.hpBg.Visible = false
     e.hpFill.Visible = false
     e.visible = false
 end
 
-local function projectBox(obj)
+local function projectBounds(obj)
     local cf, size
     if obj:IsA("Model") then
         local ok, c, s = pcall(function() return obj:GetBoundingBox() end)
@@ -372,38 +425,27 @@ local function isAlive(obj)
     return hum.Health > 0
 end
 
-local function refreshBox(e, obj, color)
-    if Config.ESPStyle ~= "Box" then
-        e.box.Visible = false
-        return
-    end
+local function refreshAdornment(e, style, color)
+    if not e.adorns then return end
+    local adornColor = Config.UseElementColorForAdornment and color or Config.AdornmentColor
+    local tr = Config.AdornmentTransparency
 
-    local x, y, w, h = projectBox(obj)
-    if not x then
-        e.box.Visible = false
-        return
-    end
+    if e.adorns.box then e.adorns.box.Visible = false end
+    if e.adorns.sphere then e.adorns.sphere.Visible = false end
+    if e.adorns.cylinder then e.adorns.cylinder.Visible = false end
 
-    local t = Config.BoxThickness
-    local tr = Config.BoxTransparency
-    local c = Config.UseElementColorForBox and color or Config.BoxColor
-
-    e.box.Visible = true
-    e.box.Position = UDim2.fromOffset(x, y)
-    e.box.Size = UDim2.fromOffset(w, h)
-
-    e.boxTop.Position    = UDim2.fromOffset(0, 0)
-    e.boxTop.Size        = UDim2.new(1, 0, 0, t)
-    e.boxBottom.Position = UDim2.new(0, 0, 1, -t)
-    e.boxBottom.Size     = UDim2.new(1, 0, 0, t)
-    e.boxLeft.Position   = UDim2.fromOffset(0, 0)
-    e.boxLeft.Size       = UDim2.new(0, t, 1, 0)
-    e.boxRight.Position  = UDim2.new(1, -t, 0, 0)
-    e.boxRight.Size      = UDim2.new(0, t, 1, 0)
-
-    for _, l in ipairs({ e.boxTop, e.boxBottom, e.boxLeft, e.boxRight }) do
-        l.BackgroundColor3 = c
-        l.BackgroundTransparency = tr
+    if style == "Adornment" and e.adorns.box then
+        e.adorns.box.Visible = true
+        e.adorns.box.Color3 = adornColor
+        e.adorns.box.Transparency = tr
+    elseif style == "SphereAdornment" and e.adorns.sphere then
+        e.adorns.sphere.Visible = true
+        e.adorns.sphere.Color3 = adornColor
+        e.adorns.sphere.Transparency = tr
+    elseif style == "CylinderAdornment" and e.adorns.cylinder then
+        e.adorns.cylinder.Visible = true
+        e.adorns.cylinder.Color3 = adornColor
+        e.adorns.cylinder.Transparency = tr
     end
 end
 
@@ -419,7 +461,7 @@ local function refreshHealthBar(e, obj)
         return
     end
 
-    local x, y, _, h = projectBox(obj)
+    local x, y, _, h = projectBounds(obj)
     if not x then
         e.hpBg.Visible = false
         return
@@ -442,15 +484,15 @@ local function refreshArrowImage(e, screen, pos, color)
     local vp = camera.ViewportSize
     local center = vp / 2
 
-    if screen.Z > 0 then
-        e.arrow.Visible = false
-        return
-    end
-
     local toObj = (pos - camera.CFrame.Position).Unit
     local dir = Vector2.new(screen.X, screen.Y) - center
     if camera.CFrame.LookVector:Dot(toObj) < 0 then
         dir = -dir
+    end
+
+    if dir.Magnitude < 1e-4 then
+        e.arrow.Visible = false
+        return
     end
 
     local ang = math.atan2(dir.Y, dir.X)
@@ -502,6 +544,14 @@ local function refreshArrowTriangle(e, pos, color)
     e.tri.Visible = true
 end
 
+local function resolveStyle()
+    local s = Config.ESPStyle
+    if s == "Highlight" or s == "Adornment" or s == "SphereAdornment" or s == "CylinderAdornment" then
+        return s
+    end
+    return "Highlight"
+end
+
 local function refresh(e)
     local obj = e.obj
     if not obj or not obj:IsDescendantOf(game) then
@@ -519,28 +569,58 @@ local function refresh(e)
     local dist = (camera.CFrame.Position - pos).Magnitude
 
     if Config.MaxDistance > 0 and dist > Config.MaxDistance then
-        onScreen = false
+        hideElement(e)
+        return
     end
 
     if not onScreen then
-        hideElement(e)
+        e.hl.Enabled = false
+        e.labelFrame.Visible = false
+        e.tracer.Visible = false
+        if e.adorns then
+            if e.adorns.box then e.adorns.box.Visible = false end
+            if e.adorns.sphere then e.adorns.sphere.Visible = false end
+            if e.adorns.cylinder then e.adorns.cylinder.Visible = false end
+        end
+        e.hpBg.Visible = false
+        e.hpFill.Visible = false
+        e.visible = false
+
+        local color = Config.Rainbow and rainbowColor or e.color
+        if Config.Arrows then
+            if Config.ArrowStyle == "Triangle" and e.tri then
+                e.arrow.Visible = false
+                refreshArrowTriangle(e, pos, color)
+            else
+                if e.tri then e.tri.Visible = false end
+                refreshArrowImage(e, screen, pos, color)
+            end
+        else
+            e.arrow.Visible = false
+            if e.tri then e.tri.Visible = false end
+        end
         return
     end
 
     e.visible = true
     local color = Config.Rainbow and rainbowColor or e.color
+    local style = resolveStyle()
 
-    e.hl.Enabled = (Config.ESPStyle == "Highlight")
+    e.arrow.Visible = false
+    if e.tri then e.tri.Visible = false end
+
+    e.hl.Enabled = (style == "Highlight")
     if e.hl.Enabled then
         e.hl.FillColor = color
         e.hl.OutlineColor = Config.MatchColors and color or Config.OutlineColor
+        e.hl.DepthMode = Config.DepthMode
         if e.active then
             e.hl.FillTransparency = Config.FillTransparency
             e.hl.OutlineTransparency = Config.OutlineTransparency
         end
     end
 
-    refreshBox(e, obj, color)
+    refreshAdornment(e, style, color)
     refreshHealthBar(e, obj)
 
     e.labelFrame.Visible = true
@@ -586,19 +666,6 @@ local function refresh(e)
     else
         e.tracer.Visible = false
     end
-
-    if Config.Arrows then
-        if Config.ArrowStyle == "Triangle" and e.tri then
-            e.arrow.Visible = false
-            refreshArrowTriangle(e, pos, color)
-        else
-            if e.tri then e.tri.Visible = false end
-            refreshArrowImage(e, screen, pos, color)
-        end
-    else
-        e.arrow.Visible = false
-        if e.tri then e.tri.Visible = false end
-    end
 end
 
 local accum = 0
@@ -631,7 +698,7 @@ end)
 local API = {}
 API.Config = Config
 API.Anchors = Anchors
-API.Styles = { "Highlight", "Box" }
+API.Styles = { "Highlight", "Adornment", "SphereAdornment", "CylinderAdornment" }
 
 function API:Add(object, text, color)
     if unloaded or not object then return end
@@ -667,6 +734,7 @@ function API:Unload()
     camConn:Disconnect()
 
     Gui.Enabled = false
+    if AdornLayer then AdornLayer:Destroy() end
 end
 
 if getgenv then
