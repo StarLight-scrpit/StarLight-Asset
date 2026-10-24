@@ -1,79 +1,49 @@
-local cloneref = cloneref or function(o) return o end
-
-local Players      = cloneref(game:GetService("Players"))
-local RunService   = cloneref(game:GetService("RunService"))
-local TweenService = cloneref(game:GetService("TweenService"))
-local Workspace    = cloneref(workspace)
-local LocalPlayer  = Players.LocalPlayer
-
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = workspace
+local LocalPlayer = Players.LocalPlayer
 local DrawingAPI = Drawing
-
-local _uid = 0
-local function newId()
-    _uid = _uid + 1
-    return "e" .. _uid
-end
-
-local Anchors = {
-    TopLeft     = Vector2.new(0.00, 0.00),
-    Top         = Vector2.new(0.50, 0.00),
-    TopRight    = Vector2.new(1.00, 0.00),
-    Left        = Vector2.new(0.00, 0.50),
-    Center      = Vector2.new(0.50, 0.50),
-    Right       = Vector2.new(1.00, 0.50),
-    BottomLeft  = Vector2.new(0.00, 1.00),
-    Bottom      = Vector2.new(0.50, 1.00),
-    BottomRight = Vector2.new(1.00, 1.00),
-}
 
 local Config = {
     Font = Enum.Font.RobotoCondensed,
     TextSize = 20,
-    TextTransparency = 0,
-    TextStrokeTransparency = 0,
-    FadeTime = 0,
+    RenderRate = 60,
+    Rainbow = false,
 
-    FillTransparency = 0.75,
+    ESPStyle = "Highlight",
+
+    FillTransparency = 0.5,
     OutlineTransparency = 0,
     OutlineColor = Color3.fromRGB(255, 255, 255),
     MatchColors = true,
     DepthMode = Enum.HighlightDepthMode.AlwaysOnTop,
 
-    RenderRate = 60,
-    Rainbow = false,
-
-    ESPStyle = "Highlight",
     AdornmentColor = Color3.fromRGB(255, 255, 255),
     AdornmentTransparency = 0.5,
     UseElementColorForAdornment = true,
 
-    Tracers = false,
+    Tracers = true,
     TracerAnchor = "Bottom",
-    TracerThickness = 1,
+    TracerThickness = 2,
+    TracerTransparency = 0,
 
-    Arrows = false,
+    Arrows = true,
     ArrowStyle = "Image",
-    ArrowRadius = 200,
+    ArrowRadius = 0.35,
+    ArrowSize = 50,
 
-    TriangleDistFromCenter = 80,
-    TriangleHeight = 16,
-    TriangleWidth = 16,
+    TriangleSize = 18,
+    TriangleThickness = 1,
     TriangleFilled = true,
     TriangleTransparency = 0,
-    TriangleThickness = 1,
-    TriangleColor = Color3.fromRGB(255, 255, 255),
     TriangleAntiAliasing = false,
 
     ShowName = true,
     ShowHealth = false,
     ShowDistance = false,
     DistanceSuffix = " studs",
-    DistanceSizeRatio = 1,
-    MaxDistance = 300,
-
-    ShowHealthBar = false,
-    HealthBarWidth = 2,
-    DynamicHealthColor = true,
+    MaxDistance = 5000,
 
     TeamCheck = false,
     VisibleCheck = false,
@@ -85,6 +55,24 @@ local elements = {}
 local hue = 0
 local rainbowColor = Color3.new(1, 1, 1)
 local camera = Workspace.CurrentCamera
+local _uid = 0
+
+local Anchors = {
+    Top = Vector2.new(0.5, 0),
+    Bottom = Vector2.new(0.5, 1),
+    Center = Vector2.new(0.5, 0.5),
+    TopLeft = Vector2.new(0, 0),
+    TopRight = Vector2.new(1, 0),
+    BottomLeft = Vector2.new(0, 1),
+    BottomRight = Vector2.new(1, 1),
+    Left = Vector2.new(0, 0.5),
+    Right = Vector2.new(1, 0.5),
+}
+
+local function newId()
+    _uid = _uid + 1
+    return "sl_" .. _uid
+end
 
 local host
 if gethui then
@@ -94,124 +82,36 @@ end
 host = host or game:GetService("CoreGui")
 
 local Gui = Instance.new("ScreenGui")
-Gui.Name = "esp_" .. tostring(math.random(100000, 999999))
+Gui.Name = "sl_esp_" .. tostring(math.random(100000, 999999))
 Gui.ResetOnSpawn = false
 Gui.IgnoreGuiInset = true
-Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+Gui.DisplayOrder = 2147483647
 Gui.Parent = host
 
-local TracerLayer = Instance.new("Frame")
-TracerLayer.Size = UDim2.fromScale(1, 1)
-TracerLayer.BackgroundTransparency = 1
-TracerLayer.Visible = true
-TracerLayer.ZIndex = 5
-TracerLayer.Parent = Gui
+local AdornFolder = Instance.new("Folder")
+AdornFolder.Name = "sl_adorn_" .. tostring(math.random(100000, 999999))
+AdornFolder.Parent = Workspace
 
-local ArrowLayer = Instance.new("Frame")
-ArrowLayer.Size = UDim2.fromScale(1, 1)
-ArrowLayer.BackgroundTransparency = 1
-ArrowLayer.Visible = true
-ArrowLayer.ZIndex = 5
-ArrowLayer.Parent = Gui
-
-local AdornLayer = Instance.new("Folder")
-AdornLayer.Name = "esp_adorn_" .. tostring(math.random(100000, 999999))
-AdornLayer.Parent = Workspace
-
-local ArrowProto = Instance.new("ImageLabel")
-ArrowProto.Name = "arrow_proto"
-ArrowProto.Image = "rbxassetid://16368985219"
-ArrowProto.Size = UDim2.fromOffset(50, 50)
-ArrowProto.AnchorPoint = Vector2.new(0.5, 0.5)
-ArrowProto.BackgroundTransparency = 1
-ArrowProto.ImageTransparency = 1
-
-local ArrowAspect = Instance.new("UIAspectRatioConstraint")
-ArrowAspect.AspectRatio = 1
-ArrowAspect.Parent = ArrowProto
-
-local function fade(inst, props)
-    if Config.FadeTime <= 0 then
-        for k, v in pairs(props) do inst[k] = v end
-        return
+local function getPosition(obj)
+    if obj:IsA("Model") then
+        local ok, pivot = pcall(function() return obj:GetPivot() end)
+        if ok then return pivot.Position end
+        local pp = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
+        if pp then return pp.Position end
+        return Vector3.zero
     end
-    TweenService:Create(inst, TweenInfo.new(Config.FadeTime, Enum.EasingStyle.Quad), props):Play()
+    return obj.Position
 end
 
-local function rotateVect(v, deg)
-    local a = math.rad(deg)
-    local c, s = math.cos(a), math.sin(a)
-    return Vector2.new(v.X * c - v.Y * s, v.X * s + v.Y * c)
-end
-
-local function horizontalRelative(pos)
-    local camP = camera.CFrame.Position
-    local look = camera.CFrame.LookVector
-    local flat = Vector3.new(look.X, 0, look.Z)
-    if flat.Magnitude < 1e-4 then flat = Vector3.new(0, 0, -1) end
-    local basis = CFrame.new(Vector3.zero, flat)
-    local rel = basis:VectorToObjectSpace(pos - camP)
-    return Vector2.new(rel.X, rel.Z)
-end
-
-local function healthColor(hum)
-    if not hum then return Color3.fromRGB(0, 255, 0) end
-    local r = math.clamp(hum.Health / math.max(hum.MaxHealth, 1), 0, 1)
-    return Color3.fromRGB(math.floor((1 - r) * 255), math.floor(r * 255), 0)
-end
-
-local function getObjectSize(obj)
+local function getSize(obj)
     if obj:IsA("Model") then
         local ok, _, size = pcall(function() return obj:GetBoundingBox() end)
         if ok and size and size.Magnitude > 0 then return size end
         local pp = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
         if pp then return pp.Size end
-    elseif obj:IsA("BasePart") then
-        return obj.Size
+        return Vector3.new(4, 5, 2)
     end
-    return Vector3.new(4, 5, 2)
-end
-
-local function makeAdornments(obj, parent)
-    local size = getObjectSize(obj)
-    local adorns = {}
-
-    adorns.box = Instance.new("BoxHandleAdornment")
-    adorns.box.Name = newId()
-    adorns.box.Adornee = obj
-    adorns.box.Size = size
-    adorns.box.AlwaysOnTop = true
-    adorns.box.ZIndex = 10
-    adorns.box.Color3 = Color3.new(1, 1, 1)
-    adorns.box.Transparency = 0.5
-    adorns.box.Visible = false
-    adorns.box.Parent = parent
-
-    adorns.sphere = Instance.new("SphereHandleAdornment")
-    adorns.sphere.Name = newId()
-    adorns.sphere.Adornee = obj
-    adorns.sphere.Radius = size.X * 1.085
-    adorns.sphere.AlwaysOnTop = true
-    adorns.sphere.ZIndex = 10
-    adorns.sphere.Color3 = Color3.new(1, 1, 1)
-    adorns.sphere.Transparency = 0.5
-    adorns.sphere.Visible = false
-    adorns.sphere.Parent = parent
-
-    adorns.cylinder = Instance.new("CylinderHandleAdornment")
-    adorns.cylinder.Name = newId()
-    adorns.cylinder.Adornee = obj
-    adorns.cylinder.Height = size.Y * 2
-    adorns.cylinder.Radius = size.X * 1.085
-    adorns.cylinder.CFrame = CFrame.new() * CFrame.Angles(math.rad(90), 0, 0)
-    adorns.cylinder.AlwaysOnTop = true
-    adorns.cylinder.ZIndex = 10
-    adorns.cylinder.Color3 = Color3.new(1, 1, 1)
-    adorns.cylinder.Transparency = 0.5
-    adorns.cylinder.Visible = false
-    adorns.cylinder.Parent = parent
-
-    return adorns
+    return obj.Size
 end
 
 local function makeElement(obj, text, color)
@@ -220,11 +120,9 @@ local function makeElement(obj, text, color)
         text = text,
         color = color,
         active = true,
-        visible = false,
     }
 
     e.hl = Instance.new("Highlight")
-    e.hl.Name = newId()
     e.hl.DepthMode = Config.DepthMode
     e.hl.Adornee = obj
     e.hl.FillTransparency = 1
@@ -232,74 +130,100 @@ local function makeElement(obj, text, color)
     e.hl.Enabled = false
     e.hl.Parent = Gui
 
-    e.adorns = makeAdornments(obj, AdornLayer)
+    local size = getSize(obj)
+    e.adorns = {}
 
-    e.labelFrame = Instance.new("Frame")
-    e.labelFrame.Name = newId()
-    e.labelFrame.Size = UDim2.fromScale(1, 1)
-    e.labelFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-    e.labelFrame.BackgroundTransparency = 1
-    e.labelFrame.Visible = false
-    e.labelFrame.Parent = Gui
+    e.adorns.box = Instance.new("BoxHandleAdornment")
+    e.adorns.box.Adornee = obj
+    e.adorns.box.Size = size
+    e.adorns.box.AlwaysOnTop = true
+    e.adorns.box.ZIndex = 10
+    e.adorns.box.Color3 = color
+    e.adorns.box.Transparency = 0.5
+    e.adorns.box.Visible = false
+    e.adorns.box.Parent = AdornFolder
+
+    e.adorns.sphere = Instance.new("SphereHandleAdornment")
+    e.adorns.sphere.Adornee = obj
+    e.adorns.sphere.Radius = size.X * 1.085
+    e.adorns.sphere.AlwaysOnTop = true
+    e.adorns.sphere.ZIndex = 10
+    e.adorns.sphere.Color3 = color
+    e.adorns.sphere.Transparency = 0.5
+    e.adorns.sphere.Visible = false
+    e.adorns.sphere.Parent = AdornFolder
+
+    e.adorns.cylinder = Instance.new("CylinderHandleAdornment")
+    e.adorns.cylinder.Adornee = obj
+    e.adorns.cylinder.Height = size.Y * 2
+    e.adorns.cylinder.Radius = size.X * 1.085
+    e.adorns.cylinder.CFrame = CFrame.new() * CFrame.Angles(math.rad(90), 0, 0)
+    e.adorns.cylinder.AlwaysOnTop = true
+    e.adorns.cylinder.ZIndex = 10
+    e.adorns.cylinder.Color3 = color
+    e.adorns.cylinder.Transparency = 0.5
+    e.adorns.cylinder.Visible = false
+    e.adorns.cylinder.Parent = AdornFolder
 
     e.label = Instance.new("TextLabel")
-    e.label.Name = newId()
-    e.label.Size = UDim2.fromScale(1, 1)
+    e.label.Size = UDim2.fromOffset(200, 50)
+    e.label.AnchorPoint = Vector2.new(0.5, 0.5)
     e.label.BackgroundTransparency = 1
     e.label.Font = Config.Font
     e.label.TextSize = Config.TextSize
     e.label.Text = text
     e.label.TextColor3 = color
-    e.label.TextTransparency = 1
-    e.label.TextStrokeTransparency = Config.TextStrokeTransparency
+    e.label.TextStrokeTransparency = 0
     e.label.RichText = true
-    e.label.Parent = e.labelFrame
+    e.label.Visible = false
+    e.label.Parent = Gui
 
-    e.hpBg = Instance.new("Frame")
-    e.hpBg.Name = newId()
-    e.hpBg.BackgroundColor3 = Color3.new(0, 0, 0)
-    e.hpBg.BackgroundTransparency = 0.4
-    e.hpBg.BorderSizePixel = 0
-    e.hpBg.Visible = false
-    e.hpBg.Parent = Gui
+    e.tracer = nil
+    e.tracerType = nil
+    do
+        local ok, p = pcall(function()
+            local path = Instance.new("Path2D")
+            path.Thickness = Config.TracerThickness
+            path.Color3 = color
+            path.Transparency = Config.TracerTransparency
+            path.Closed = false
+            path.Visible = false
+            path.Parent = Gui
+            return path
+        end)
+        if ok and p then
+            e.tracer = p
+            e.tracerType = "Path2D"
+        else
+            local f = Instance.new("Frame")
+            f.AnchorPoint = Vector2.new(0.5, 0.5)
+            f.BorderSizePixel = 0
+            f.BackgroundColor3 = color
+            f.Visible = false
+            f.Parent = Gui
+            e.tracer = f
+            e.tracerType = "Frame"
+        end
+    end
 
-    e.hpFill = Instance.new("Frame")
-    e.hpFill.Name = newId()
-    e.hpFill.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
-    e.hpFill.BorderSizePixel = 0
-    e.hpFill.Parent = e.hpBg
-
-    e.tracer = Instance.new("Frame")
-    e.tracer.Name = newId()
-    e.tracer.AnchorPoint = Vector2.new(0.5, 0.5)
-    e.tracer.BackgroundTransparency = 1
-    e.tracer.Visible = false
-    e.tracer.Parent = TracerLayer
-
-    e.tracerStroke = Instance.new("UIStroke")
-    e.tracerStroke.Name = newId()
-    e.tracerStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-    e.tracerStroke.Transparency = 1
-    e.tracerStroke.Parent = e.tracer
-
-    e.arrow = ArrowProto:Clone()
-    e.arrow.Name = newId()
+    e.arrow = Instance.new("ImageLabel")
+    e.arrow.Size = UDim2.new(0, Config.ArrowSize, 0, Config.ArrowSize)
+    e.arrow.SizeConstraint = Enum.SizeConstraint.RelativeYY
+    e.arrow.AnchorPoint = Vector2.new(0.5, 0.5)
+    e.arrow.BackgroundTransparency = 1
+    e.arrow.BorderSizePixel = 0
+    e.arrow.Image = "rbxassetid://16368985219"
+    e.arrow.ImageColor3 = color
     e.arrow.Visible = false
-    e.arrow.Parent = ArrowLayer
+    e.arrow.Parent = Gui
 
     if DrawingAPI then
         local ok, tri = pcall(function() return DrawingAPI.new("Triangle") end)
         if ok and tri then
             tri.Visible = false
-            e.tri = tri
+            e.triangle = tri
         end
     end
-
-    fade(e.hl, { FillTransparency = Config.FillTransparency, OutlineTransparency = Config.OutlineTransparency })
-    fade(e.label, { TextTransparency = Config.TextTransparency, TextStrokeTransparency = Config.TextStrokeTransparency })
-    fade(e.tracer, { BackgroundTransparency = 0 })
-    fade(e.tracerStroke, { Transparency = 0 })
-    fade(e.arrow, { ImageTransparency = 0 })
 
     return e
 end
@@ -307,93 +231,35 @@ end
 local function destroyElement(e)
     if e.hl then e.hl:Destroy() end
     if e.adorns then
-        if e.adorns.box then e.adorns.box:Destroy() end
-        if e.adorns.sphere then e.adorns.sphere:Destroy() end
-        if e.adorns.cylinder then e.adorns.cylinder:Destroy() end
+        for _, a in pairs(e.adorns) do
+            if a then a:Destroy() end
+        end
     end
-    if e.labelFrame then e.labelFrame:Destroy() end
-    if e.hpBg then e.hpBg:Destroy() end
-    if e.tracer then e.tracer:Destroy() end
+    if e.label then e.label:Destroy() end
+    if e.tracer then pcall(function() e.tracer:Destroy() end) end
     if e.arrow then e.arrow:Destroy() end
-    if e.tri then pcall(function() e.tri:Remove() end) end
+    if e.triangle then pcall(function() e.triangle:Remove() end) end
     elements[e.obj] = nil
-end
-
-local function leaveElement(e)
-    if not e.active then return end
-    e.active = false
-    e.visible = false
-
-    fade(e.label, { TextTransparency = 1 })
-    fade(e.tracer, { BackgroundTransparency = 1 })
-    fade(e.tracerStroke, { Transparency = 1 })
-    fade(e.hl, { FillTransparency = 1, OutlineTransparency = 1 })
-    fade(e.arrow, { ImageTransparency = 1 })
-
-    if e.tri then e.tri.Visible = false end
-    if e.adorns then
-        if e.adorns.box then e.adorns.box.Visible = false end
-        if e.adorns.sphere then e.adorns.sphere.Visible = false end
-        if e.adorns.cylinder then e.adorns.cylinder.Visible = false end
-    end
-    e.hpBg.Visible = false
-    e.hpFill.Visible = false
-
-    task.delay(Config.FadeTime + 0.05, function()
-        if not e.active then destroyElement(e) end
-    end)
 end
 
 local function hideElement(e)
     e.hl.Enabled = false
-    e.labelFrame.Visible = false
-    e.tracer.Visible = false
+    e.label.Visible = false
+    if e.tracer then e.tracer.Visible = false end
     e.arrow.Visible = false
-    if e.tri then e.tri.Visible = false end
+    if e.triangle then e.triangle.Visible = false end
     if e.adorns then
-        if e.adorns.box then e.adorns.box.Visible = false end
-        if e.adorns.sphere then e.adorns.sphere.Visible = false end
-        if e.adorns.cylinder then e.adorns.cylinder.Visible = false end
-    end
-    e.hpBg.Visible = false
-    e.hpFill.Visible = false
-    e.visible = false
-end
-
-local function projectBounds(obj)
-    local cf, size
-    if obj:IsA("Model") then
-        local ok, c, s = pcall(function() return obj:GetBoundingBox() end)
-        if not ok then return nil end
-        cf, size = c, s
-    else
-        cf, size = obj.CFrame, obj.Size
-    end
-
-    local hx, hy, hz = size.X / 2, size.Y / 2, size.Z / 2
-    local minX, minY = math.huge, math.huge
-    local maxX, maxY = -math.huge, -math.huge
-
-    for _, sx in ipairs({ -1, 1 }) do
-        for _, sy in ipairs({ -1, 1 }) do
-            for _, sz in ipairs({ -1, 1 }) do
-                local world = (cf * CFrame.new(hx * sx, hy * sy, hz * sz)).Position
-                local sp = camera:WorldToViewportPoint(world)
-                if sp.Z <= 0 then return nil end
-                if sp.X < minX then minX = sp.X end
-                if sp.Y < minY then minY = sp.Y end
-                if sp.X > maxX then maxX = sp.X end
-                if sp.Y > maxY then maxY = sp.Y end
-            end
+        for _, a in pairs(e.adorns) do
+            if a then a.Visible = false end
         end
     end
-
-    return minX, minY, maxX - minX, maxY - minY
 end
 
 local function isTeammate(obj)
-    if not Config.TeamCheck or not obj then return false end
-    local plr = Players:GetPlayerFromCharacter(obj:IsA("Model") and obj or obj.Parent)
+    if not Config.TeamCheck then return false end
+    local model = obj:IsA("Model") and obj or obj.Parent
+    if not model then return false end
+    local plr = Players:GetPlayerFromCharacter(model)
     if not plr or plr == LocalPlayer then return false end
     if not plr.Team or not LocalPlayer.Team then return false end
     return plr.Team == LocalPlayer.Team
@@ -401,102 +267,92 @@ end
 
 local function isVisible(obj)
     if not Config.VisibleCheck then return true end
-    local char = obj:IsA("Model") and obj or obj.Parent
-    if not char or not char:IsA("Model") then return true end
-
-    local target = char:FindFirstChild("Head") or char.PrimaryPart
+    local model = obj:IsA("Model") and obj or obj.Parent
+    if not model or not model:IsA("Model") then return true end
+    local target = model:FindFirstChild("Head") or model.PrimaryPart
     if not target then return true end
-
-    local filter = { char }
+    local filter = { model }
     if LocalPlayer.Character then table.insert(filter, LocalPlayer.Character) end
-
     local params = RaycastParams.new()
     params.FilterType = Enum.RaycastFilterType.Exclude
     params.FilterDescendantsInstances = filter
     params.IgnoreWater = true
-
     return Workspace:Raycast(camera.CFrame.Position, target.Position - camera.CFrame.Position, params) == nil
 end
 
 local function isAlive(obj)
     if not Config.AliveCheck then return true end
-    local char = obj:IsA("Model") and obj or obj.Parent
-    if not char or not char:IsA("Model") then return true end
-    local hum = char:FindFirstChildOfClass("Humanoid")
+    local model = obj:IsA("Model") and obj or obj.Parent
+    if not model or not model:IsA("Model") then return true end
+    local hum = model:FindFirstChildOfClass("Humanoid")
     if not hum then return true end
     return hum.Health > 0
 end
 
-local function refreshAdornment(e, style, color)
-    if not e.adorns then return end
-    local adornColor = Config.UseElementColorForAdornment and color or Config.AdornmentColor
-    local tr = Config.AdornmentTransparency
-
-    if e.adorns.box then e.adorns.box.Visible = false end
-    if e.adorns.sphere then e.adorns.sphere.Visible = false end
-    if e.adorns.cylinder then e.adorns.cylinder.Visible = false end
-
-    if style == "Adornment" and e.adorns.box then
-        e.adorns.box.Visible = true
-        e.adorns.box.Color3 = adornColor
-        e.adorns.box.Transparency = tr
-    elseif style == "SphereAdornment" and e.adorns.sphere then
-        e.adorns.sphere.Visible = true
-        e.adorns.sphere.Color3 = adornColor
-        e.adorns.sphere.Transparency = tr
-    elseif style == "CylinderAdornment" and e.adorns.cylinder then
-        e.adorns.cylinder.Visible = true
-        e.adorns.cylinder.Color3 = adornColor
-        e.adorns.cylinder.Transparency = tr
+local function updateTracerPath(e, fromPos, toPos, color)
+    local ok = pcall(function()
+        e.tracer:SetControlPoints({
+            Path2DControlPoint.new(fromPos),
+            Path2DControlPoint.new(toPos),
+        })
+    end)
+    if ok then
+        e.tracer.Color3 = color
+        e.tracer.Thickness = Config.TracerThickness
+        e.tracer.Transparency = Config.TracerTransparency
+        e.tracer.Visible = true
+    else
+        e.tracer:Destroy()
+        local f = Instance.new("Frame")
+        f.AnchorPoint = Vector2.new(0.5, 0.5)
+        f.BorderSizePixel = 0
+        f.BackgroundColor3 = color
+        f.Visible = false
+        f.Parent = Gui
+        e.tracer = f
+        e.tracerType = "Frame"
     end
 end
 
-local function refreshHealthBar(e, obj)
-    if not Config.ShowHealthBar then
-        e.hpBg.Visible = false
+local function updateTracerFrame(e, fromPos, toPos, color)
+    local fx = fromPos.X.Offset
+    local fy = fromPos.Y.Offset
+    local tx = toPos.X.Offset
+    local ty = toPos.Y.Offset
+    local dx = tx - fx
+    local dy = ty - fy
+    local len = math.sqrt(dx * dx + dy * dy)
+    if len < 1 then
+        e.tracer.Visible = false
         return
     end
-
-    local hum = obj:FindFirstChildOfClass("Humanoid")
-    if not hum then
-        e.hpBg.Visible = false
-        return
-    end
-
-    local x, y, _, h = projectBounds(obj)
-    if not x then
-        e.hpBg.Visible = false
-        return
-    end
-
-    local barW = Config.HealthBarWidth
-    e.hpBg.Visible = true
-    e.hpBg.Position = UDim2.fromOffset(x - barW - 4, y)
-    e.hpBg.Size = UDim2.fromOffset(barW, h)
-
-    local r = math.clamp(hum.Health / math.max(hum.MaxHealth, 1), 0, 1)
-    local fillH = h * r
-
-    e.hpFill.Position = UDim2.fromOffset(0, h - fillH)
-    e.hpFill.Size = UDim2.fromOffset(barW, fillH)
-    e.hpFill.BackgroundColor3 = Config.DynamicHealthColor and healthColor(hum) or Color3.fromRGB(0, 255, 0)
+    local midX = (fx + tx) / 2
+    local midY = (fy + ty) / 2
+    local ang = math.deg(math.atan2(dy, dx))
+    e.tracer.Position = UDim2.fromOffset(midX, midY)
+    e.tracer.Size = UDim2.new(0, len, 0, math.max(Config.TracerThickness, 1))
+    e.tracer.Rotation = ang
+    e.tracer.BackgroundColor3 = color
+    e.tracer.Visible = true
 end
 
-local function refreshArrowImage(e, screen, pos, color)
+local function updateArrowImage(e, screenPos, color)
     local vp = camera.ViewportSize
-    local center = vp / 2
+    local center = Vector2.new(vp.X / 2, vp.Y / 2)
+    local targetPos = getPosition(e.obj)
+    local camSpace = camera.CFrame:VectorToObjectSpace(targetPos - camera.CFrame.Position)
 
-    local rel = pos - camera.CFrame.Position
+    local isInverted = screenPos.Z <= 0
+    local invert = (isInverted and -1 or 1)
+
     local dir
-    if screen.Z > 0 then
-        dir = Vector2.new(screen.X, screen.Y) - center
+    if screenPos.Z > 0 then
+        dir = Vector2.new(screenPos.X, screenPos.Y) - center
         if dir.Magnitude < 1e-4 then
-            local camRel = camera.CFrame:VectorToObjectSpace(rel)
-            dir = Vector2.new(camRel.X, -camRel.Y)
+            dir = Vector2.new(camSpace.X, -camSpace.Y)
         end
     else
-        local camRel = camera.CFrame:VectorToObjectSpace(rel)
-        dir = Vector2.new(camRel.X, -camRel.Y)
+        dir = Vector2.new(camSpace.X, -camSpace.Y)
     end
 
     if dir.Magnitude < 1e-4 then
@@ -504,67 +360,95 @@ local function refreshArrowImage(e, screen, pos, color)
         return
     end
 
-    local ang = math.atan2(dir.Y, dir.X)
-    local radius = math.min(vp.X, vp.Y) / 2 - math.clamp(400 - Config.ArrowRadius, 0, math.min(vp.X, vp.Y) / 2 - 30)
-    local place = center + dir.Unit * radius
+    local arctan = math.atan2(dir.Y, dir.X)
+    local angle = math.deg(arctan) + 90
+    local distance = Config.ArrowRadius * vp.Y
 
-    e.arrow.Position = UDim2.fromOffset(place.X, place.Y)
-    e.arrow.Rotation = math.deg(ang) - 90
-    e.arrow.Visible = true
+    local posX = center.X + (distance * math.cos(arctan) * invert)
+    local posY = center.Y + (distance * math.sin(arctan) * invert)
+
+    local margin = 30
+    posX = math.clamp(posX, margin, vp.X - margin)
+    posY = math.clamp(posY, margin, vp.Y - margin)
+
+    e.arrow.Rotation = angle + 180 * (isInverted and 0 or 1)
+    e.arrow.Position = UDim2.fromOffset(posX, posY)
+    e.arrow.Size = UDim2.new(0, Config.ArrowSize, 0, Config.ArrowSize)
     e.arrow.ImageColor3 = color
+    e.arrow.Visible = true
 end
 
-local function refreshArrowTriangle(e, pos, color)
-    if not e.tri then return end
+local function updateArrowTriangle(e, screenPos, color)
+    if not e.triangle then return end
 
-    local _, vis = camera:WorldToViewportPoint(pos)
-    if vis then
-        e.tri.Visible = false
+    local vp = camera.ViewportSize
+    local center = Vector2.new(vp.X / 2, vp.Y / 2)
+    local targetPos = getPosition(e.obj)
+    local camSpace = camera.CFrame:VectorToObjectSpace(targetPos - camera.CFrame.Position)
+
+    local dir
+    if screenPos.Z > 0 then
+        dir = Vector2.new(screenPos.X, screenPos.Y) - center
+        if dir.Magnitude < 1e-4 then
+            dir = Vector2.new(camSpace.X, -camSpace.Y)
+        end
+    else
+        dir = Vector2.new(camSpace.X, -camSpace.Y)
+    end
+
+    if dir.Magnitude < 1e-4 then
+        e.triangle.Visible = false
         return
     end
 
-    local rel = horizontalRelative(pos)
-    if rel.Magnitude < 1e-4 then
-        e.tri.Visible = false
-        return
+    local angle = math.atan2(dir.Y, dir.X)
+    local radius = Config.ArrowRadius * math.min(vp.X, vp.Y)
+    local size = Config.TriangleSize
+
+    local cosA = math.cos(angle)
+    local sinA = math.sin(angle)
+
+    local tipX = center.X + radius * cosA
+    local tipY = center.Y + radius * sinA
+
+    local backCenterX = tipX - cosA * size
+    local backCenterY = tipY - sinA * size
+
+    local halfBase = size / 2
+    local perpX = -sinA * halfBase
+    local perpY = cosA * halfBase
+
+    local baseLX = backCenterX + perpX
+    local baseLY = backCenterY + perpY
+    local baseRX = backCenterX - perpX
+    local baseRY = backCenterY - perpY
+
+    if not Config.TriangleAntiAliasing then
+        tipX = math.floor(tipX + 0.5)
+        tipY = math.floor(tipY + 0.5)
+        baseLX = math.floor(baseLX + 0.5)
+        baseLY = math.floor(baseLY + 0.5)
+        baseRX = math.floor(baseRX + 0.5)
+        baseRY = math.floor(baseRY + 0.5)
     end
 
-    local dir = rel.Unit
-    local base = dir * Config.TriangleDistFromCenter
-    local half = Config.TriangleWidth / 2
-    local baseL = base + rotateVect(dir, 90) * half
-    local baseR = base + rotateVect(dir, -90) * half
-    local tip = dir * (Config.TriangleDistFromCenter + Config.TriangleHeight)
-
-    local center = camera.ViewportSize / 2
-
-    local function snap(v)
-        if not Config.TriangleAntiAliasing then return v end
-        return Vector2.new(math.round(v.X), math.round(v.Y))
-    end
-
-    e.tri.PointA = snap(center - baseL)
-    e.tri.PointB = snap(center - baseR)
-    e.tri.PointC = snap(center - tip)
-    e.tri.Filled = Config.TriangleFilled
-    e.tri.Thickness = Config.TriangleThickness
-    e.tri.Color = color
-    e.tri.Transparency = 1 - Config.TriangleTransparency
-    e.tri.Visible = true
-end
-
-local function resolveStyle()
-    local s = Config.ESPStyle
-    if s == "Highlight" or s == "Adornment" or s == "SphereAdornment" or s == "CylinderAdornment" then
-        return s
-    end
-    return "Highlight"
+    e.triangle.PointA = Vector2.new(tipX, tipY)
+    e.triangle.PointB = Vector2.new(baseLX, baseLY)
+    e.triangle.PointC = Vector2.new(baseRX, baseRY)
+    e.triangle.Filled = Config.TriangleFilled
+    e.triangle.Thickness = Config.TriangleThickness
+    e.triangle.Color = color
+    e.triangle.Transparency = 1 - Config.TriangleTransparency
+    e.triangle.Visible = true
 end
 
 local function refresh(e)
     local obj = e.obj
     if not obj or not obj:IsDescendantOf(game) then
-        leaveElement(e)
+        if e.active then
+            e.active = false
+            destroyElement(e)
+        end
         return
     end
 
@@ -573,119 +457,109 @@ local function refresh(e)
         return
     end
 
-    local pos = obj:GetPivot().Position
-    local screen, onScreen = camera:WorldToViewportPoint(pos)
+    local pos = getPosition(obj)
+    local screenPos, onScreen = camera:WorldToViewportPoint(pos)
     local dist = (camera.CFrame.Position - pos).Magnitude
 
     if Config.MaxDistance > 0 and dist > Config.MaxDistance then
-        onScreen = false
-    end
-
-    local color = Config.Rainbow and rainbowColor or e.color
-
-    if not onScreen then
-        e.hl.Enabled = false
-        e.labelFrame.Visible = false
-        e.tracer.Visible = false
-        if e.adorns then
-            if e.adorns.box then e.adorns.box.Visible = false end
-            if e.adorns.sphere then e.adorns.sphere.Visible = false end
-            if e.adorns.cylinder then e.adorns.cylinder.Visible = false end
-        end
-        e.hpBg.Visible = false
-        e.hpFill.Visible = false
-        e.visible = false
-
-        if Config.Arrows then
-            if Config.ArrowStyle == "Triangle" and e.tri then
-                e.arrow.Visible = false
-                refreshArrowTriangle(e, pos, color)
-            else
-                if e.tri then e.tri.Visible = false end
-                refreshArrowImage(e, screen, pos, color)
-            end
-        else
-            e.arrow.Visible = false
-            if e.tri then e.tri.Visible = false end
-        end
+        hideElement(e)
         return
     end
 
-    e.visible = true
-    local style = resolveStyle()
+    local color = Config.Rainbow and rainbowColor or e.color
+    local style = Config.ESPStyle
 
+    e.hl.Enabled = false
+    e.label.Visible = false
+    if e.tracer then e.tracer.Visible = false end
     e.arrow.Visible = false
-    if e.tri then e.tri.Visible = false end
+    if e.triangle then e.triangle.Visible = false end
+    for _, a in pairs(e.adorns) do
+        if a then a.Visible = false end
+    end
 
-    e.hl.Enabled = (style == "Highlight")
-    if e.hl.Enabled then
-        e.hl.FillColor = color
-        e.hl.OutlineColor = Config.MatchColors and color or Config.OutlineColor
-        e.hl.DepthMode = Config.DepthMode
-        if e.active then
+    if onScreen then
+        if style == "Highlight" then
+            e.hl.Enabled = true
+            e.hl.FillColor = color
+            e.hl.OutlineColor = Config.MatchColors and color or Config.OutlineColor
             e.hl.FillTransparency = Config.FillTransparency
             e.hl.OutlineTransparency = Config.OutlineTransparency
+        elseif style == "Adornment" then
+            e.adorns.box.Visible = true
+            e.adorns.box.Color3 = Config.UseElementColorForAdornment and color or Config.AdornmentColor
+            e.adorns.box.Transparency = Config.AdornmentTransparency
+        elseif style == "SphereAdornment" then
+            e.adorns.sphere.Visible = true
+            e.adorns.sphere.Color3 = Config.UseElementColorForAdornment and color or Config.AdornmentColor
+            e.adorns.sphere.Transparency = Config.AdornmentTransparency
+        elseif style == "CylinderAdornment" then
+            e.adorns.cylinder.Visible = true
+            e.adorns.cylinder.Color3 = Config.UseElementColorForAdornment and color or Config.AdornmentColor
+            e.adorns.cylinder.Transparency = Config.AdornmentTransparency
         end
-    end
 
-    refreshAdornment(e, style, color)
-    refreshHealthBar(e, obj)
+        if Config.Tracers and e.tracer then
+            local vp = camera.ViewportSize
+            local fromPos
+            if Config.TracerAnchor == "Mouse" then
+                local m = UserInputService:GetMouseLocation()
+                fromPos = UDim2.fromOffset(m.X, m.Y)
+            else
+                local anchor = Anchors[Config.TracerAnchor] or Anchors.Bottom
+                fromPos = UDim2.fromOffset(vp.X * anchor.X, vp.Y * anchor.Y)
+            end
+            local toPos = UDim2.fromOffset(screenPos.X, screenPos.Y)
 
-    e.labelFrame.Visible = true
-    e.labelFrame.Position = UDim2.fromOffset(screen.X, screen.Y)
-    e.label.TextColor3 = color
-    e.label.TextSize = Config.TextSize
-    e.label.Font = Config.Font
-    if e.active then
-        e.label.TextTransparency = Config.TextTransparency
-        e.label.TextStrokeTransparency = Config.TextStrokeTransparency
-    end
-
-    local lines = {}
-    if Config.ShowName then table.insert(lines, e.text) end
-    if Config.ShowHealth then
-        local hum = obj:FindFirstChildOfClass("Humanoid")
-        if hum then
-            lines[#lines + 1] = string.format("%d/%d", math.floor(hum.Health), math.floor(hum.MaxHealth))
+            if e.tracerType == "Path2D" then
+                updateTracerPath(e, fromPos, toPos, color)
+            else
+                updateTracerFrame(e, fromPos, toPos, color)
+            end
         end
-    end
-    if Config.ShowDistance then
-        local s = math.round(Config.TextSize * Config.DistanceSizeRatio)
-        lines[#lines + 1] = string.format('<font size="%d">[%d%s]</font>', s, math.floor(dist), Config.DistanceSuffix)
-    end
-    e.label.Text = table.concat(lines, "\n")
 
-    if Config.Tracers then
-        local vp = camera.ViewportSize
-        local anchor = Anchors[Config.TracerAnchor] or Anchors.Bottom
-        local origin = Vector2.new(vp.X * anchor.X, vp.Y * anchor.Y)
-        local dest = Vector2.new(screen.X, screen.Y)
-        local mid = (origin + dest) / 2
-        local len = (origin - dest).Magnitude
-        local ang = math.deg(math.atan2(dest.Y - origin.Y, dest.X - origin.X))
+        e.label.Visible = true
+        e.label.Position = UDim2.fromOffset(screenPos.X, screenPos.Y)
+        e.label.TextColor3 = color
+        e.label.TextSize = Config.TextSize
+        e.label.Font = Config.Font
 
-        e.tracer.Position = UDim2.fromOffset(mid.X, mid.Y)
-        e.tracer.Size = UDim2.new(0, len, 0, 1)
-        e.tracer.Rotation = ang
-        e.tracer.BackgroundColor3 = color
-        e.tracer.Visible = true
-        e.tracerStroke.Color = color
-        e.tracerStroke.Thickness = Config.TracerThickness
+        local lines = {}
+        if Config.ShowName then table.insert(lines, e.text) end
+        if Config.ShowHealth then
+            local hum = obj:FindFirstChildOfClass("Humanoid")
+            if hum then
+                lines[#lines + 1] = string.format("%d/%d", math.floor(hum.Health), math.floor(hum.MaxHealth))
+            end
+        end
+        if Config.ShowDistance then
+            lines[#lines + 1] = string.format("[%d%s]", math.floor(dist), Config.DistanceSuffix)
+        end
+        e.label.Text = table.concat(lines, "\n")
     else
-        e.tracer.Visible = false
+        if Config.Arrows then
+            if Config.ArrowStyle == "Triangle" and e.triangle then
+                updateArrowTriangle(e, screenPos, color)
+            else
+                updateArrowImage(e, screenPos, color)
+            end
+        end
     end
 end
 
 local accum = 0
 local hbConn = RunService.Heartbeat:Connect(function(dt)
     if unloaded then return end
-
     accum = accum + dt
     if accum < 1 / Config.RenderRate then return end
     accum = 0
-
     for _, e in pairs(elements) do
-        if e.active then refresh(e) end
+        if e.active then
+            local ok, err = pcall(refresh, e)
+            if not ok then
+                warn("[StarLight ESP] refresh error:", err)
+            end
+        end
     end
 end)
 
@@ -707,12 +581,12 @@ local API = {}
 API.Config = Config
 API.Anchors = Anchors
 API.Styles = { "Highlight", "Adornment", "SphereAdornment", "CylinderAdornment" }
+API.ArrowStyles = { "Image", "Triangle" }
 
 function API:Add(object, text, color)
     if unloaded or not object then return end
     if not (object:IsA("BasePart") or object:IsA("Model")) then return end
     if elements[object] then return elements[object] end
-
     local e = makeElement(object, text or object.Name, color or Color3.fromRGB(255, 255, 255))
     elements[object] = e
     return e
@@ -720,7 +594,10 @@ end
 
 function API:Remove(object)
     local e = elements[object]
-    if e then leaveElement(e) end
+    if e then
+        e.active = false
+        destroyElement(e)
+    end
 end
 
 function API:Update(object, text, color)
@@ -733,16 +610,16 @@ end
 function API:Unload()
     if unloaded then return end
     unloaded = true
-
-    for _, e in pairs(elements) do destroyElement(e) end
+    for _, e in pairs(elements) do
+        e.active = false
+        destroyElement(e)
+    end
     elements = {}
-
     hbConn:Disconnect()
     rainbowConn:Disconnect()
     camConn:Disconnect()
-
-    Gui.Enabled = false
-    if AdornLayer then AdornLayer:Destroy() end
+    Gui:Destroy()
+    if AdornFolder then AdornFolder:Destroy() end
 end
 
 if getgenv then
