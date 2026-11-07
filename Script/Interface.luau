@@ -1,6 +1,6 @@
 local interface = {}
 
-local BASE = "https://raw.githubusercontent.com/StarLight-scrpit/StarLight-Asset/main/UI/"
+local Base = "https://raw.githubusercontent.com/StarLight-scrpit/StarLight-Asset/main/UI/"
 
 local available = {
     ["LinoriaLib"] = true,
@@ -48,7 +48,7 @@ function interface.load(name)
         return nil, "unknown UI: " .. tostring(name)
     end
 
-    local url = BASE .. name .. ".luau"
+    local url = Base .. name .. ".luau"
     local src = game:HttpGet(url)
     if not src or #src == 0 then
         return nil, "fetch failed: " .. url
