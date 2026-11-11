@@ -1,0 +1,73 @@
+StarLight License
+Version 1.0
+
+Copyright (c) January 2024 StarLight-Asset copyright holder
+Project name: StarLight-Asset
+Project URL: https://github.com/StarLight-scrpit/StarLight-Asset/tree/main
+Contact: xiaofengshijie@outlook.com
+
+This License applies to StarLight-Asset and its source code, documentation, and related files (the “Software”).
+By copying, using, modifying, or distributing the Software, you agree to be bound by this License. If you do not agree, do not use the Software.
+
+1. Definitions
+
+1.1 “Commercial Use” means any use in connection with a commercial activity or for direct or indirect economic benefit, including without limitation: sale, licensing, subscription, paid services, SaaS, consulting, technical support, internal production use by an entity, bundling, or deployment intended to generate revenue.
+
+1.2 “Modified Version” means any work formed by modifying, adding to, deleting from, translating, reorganizing, merging, or otherwise adapting the Software.
+
+1.3 “Source Attribution” means the project name, copyright holder, project URL, name and version of this License, and all original copyright and license notices.
+
+1.4 “Advertising or Promotion” means using the Software, a Modified Version, the project name, logos, author names, or code snippets in advertising, marketing, promotion, lead generation, endorsement, or in any way suggesting cooperation with, approval by, sponsorship by, or affiliation with the copyright holder.
+
+2. Grant of License
+
+Subject to full compliance with this License, the copyright holder grants you a worldwide, non-exclusive, royalty-free, non-transferable license to do the following for personal study, research, teaching, non-profit projects, and other non-commercial purposes:
+
+(a) copy and use the Software;
+(b) modify the Software and create Modified Versions;
+(c) distribute the Software and Modified Versions.
+
+Any Commercial Use requires the prior written permission of the copyright holder.
+Regardless of whether it constitutes Commercial Use, you may not use a Modified Version or derivative work for any direct or indirect profit-making purpose without the prior written permission of the copyright holder.
+
+3. Conditions
+
+3.1 Source Attribution
+When you copy, distribute, publicly disclose a Modified Version, or otherwise use the Software, you must:
+(a) retain this License in full and all copyright, author, and source notices;
+(b) clearly state in the source code, documentation, about page, or distribution notice:
+    “This work is based on StarLight-Asset (https://github.com/StarLight-scrpit/StarLight-Asset/tree/main) and is used under the StarLight License 1.0.”;
+(c) clearly mark any modifications and the date of modification in a Modified Version.
+
+3.2 Commercial License
+Any Commercial Use requires the prior written permission of the copyright holder. A commercial license may set separate terms and, to the extent agreed, replace the corresponding restrictions in this License.
+
+3.3 No Advertising
+Without the prior written permission of the copyright holder, you may not:
+(a) use the Software, a Modified Version, the project name, logos, author names, or code snippets in advertising, marketing, promotion, lead generation, endorsement, or in any way suggest cooperation with, approval by, or affiliation with the copyright holder;
+(b) use “StarLight” or the project name for promotion in app store descriptions, websites, social media, domain names, or promotional materials;
+(c) insert, display, or force third-party advertisements in the Software or a Modified Version.
+
+3.4 No Monetization of Modified Versions
+Without the prior written permission of the copyright holder, you may not sell, rent, license, subscribe, charge per use, monetize through advertising, bundle, or otherwise directly or indirectly profit from a Modified Version or derivative work; nor may you charge for a Modified Version through paid services, SaaS, consulting, or technical support.
+
+3.5 Distribution
+When distributing the Software or a Modified Version, you must provide the recipient with the full text of this License and ensure that the recipient is aware of and complies with this License. You may not remove, circumvent, or conceal this License, copyright notices, or Source Attribution.
+
+4. Commercial Licensing
+
+If you need Commercial Use, or need to use a Modified Version for profit-making purposes, please contact xiaofengshijie@outlook.com to obtain separate written permission. Before such written permission is obtained, all such activities are prohibited.
+
+5. Termination
+
+If you violate any term of this License, the authorization granted to you under this License terminates automatically. After termination, you must immediately stop using, copying, modifying, and distributing the Software and Modified Versions, and delete or destroy copies in your possession within a reasonable scope. Termination does not affect other remedies available to the copyright holder.
+
+6. Disclaimer
+
+THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM THE SOFTWARE OR THIS LICENSE, WHETHER IN CONTRACT, TORT, OR OTHERWISE.
+
+7. Miscellaneous
+
+7.1 This License does not grant trademark rights. Except as provided in Section 3.3, you may not use the project name, logos, or author names without the prior written permission of the copyright holder.
+7.2 If the Software contains third-party code, including MIT-licensed code, that third-party code remains licensed under its original license. This License applies only to the original parts that the copyright holder has the right to license and does not limit or replace the rights granted by third-party licenses.
+7.3 The English version of this License shall prevail.
